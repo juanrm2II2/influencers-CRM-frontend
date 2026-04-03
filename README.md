@@ -1,6 +1,6 @@
 # Influencer CRM Frontend
 
-A Next.js 14 frontend for managing influencer partnerships — built with TypeScript and Tailwind CSS.
+A Next.js 15 frontend for managing influencer partnerships — built with TypeScript and Tailwind CSS.
 
 ## Features
 
@@ -12,7 +12,7 @@ A Next.js 14 frontend for managing influencer partnerships — built with TypeSc
 
 ## Tech Stack
 
-- [Next.js 14](https://nextjs.org/) (App Router)
+- [Next.js 15](https://nextjs.org/) (App Router)
 - [TypeScript](https://www.typescriptlang.org/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Axios](https://axios-http.com/) for API calls

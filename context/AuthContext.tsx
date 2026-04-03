@@ -16,13 +16,15 @@ import type { User, AuthTokens, LoginCredentials, Role } from '@/types';
 const TOKEN_KEY = 'crm_tokens';
 const USER_KEY = 'crm_user';
 const COOKIE_NAME = 'crm_access_token';
+const IS_SECURE = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
 function persistTokens(tokens: AuthTokens): void {
   try {
     sessionStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
     // Also set an HTTP cookie so the Next.js edge middleware can guard routes.
     // The cookie is SameSite=Strict to mitigate CSRF (F-006).
-    document.cookie = `${COOKIE_NAME}=${encodeURIComponent(tokens.accessToken)}; path=/; SameSite=Strict; Secure`;
+    const secureFlag = IS_SECURE ? '; Secure' : '';
+    document.cookie = `${COOKIE_NAME}=${encodeURIComponent(tokens.accessToken)}; path=/; SameSite=Strict${secureFlag}`;
   } catch {
     // Storage full or unavailable – continue without persistence
   }
@@ -42,7 +44,8 @@ function clearTokens(): void {
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
     // Remove the route-guard cookie
-    document.cookie = `${COOKIE_NAME}=; path=/; max-age=0; SameSite=Strict; Secure`;
+    const secureFlag = IS_SECURE ? '; Secure' : '';
+    document.cookie = `${COOKIE_NAME}=; path=/; max-age=0; SameSite=Strict${secureFlag}`;
   } catch {
     // Ignore
   }

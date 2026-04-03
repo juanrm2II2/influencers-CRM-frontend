@@ -23,6 +23,7 @@ export default function UserMenu() {
 
   const initials = user.name
     .split(' ')
+    .filter(Boolean)
     .map((n) => n[0])
     .join('')
     .slice(0, 2)

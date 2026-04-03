@@ -29,6 +29,10 @@ export function middleware(request: NextRequest) {
   }
 
   // ── Route-level auth guard ──────────────────────────────────────────────
+  // NOTE: This is a UX-level guard that checks for token *presence* only.
+  // Actual JWT signature / expiration validation happens on the backend for
+  // every API call.  Adding server-side JWT verification here would require
+  // sharing the signing secret with the frontend, which is not recommended.
   const isPublic = PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );

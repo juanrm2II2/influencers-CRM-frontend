@@ -2,6 +2,7 @@ import axios from 'axios';
 import { Influencer, Outreach, DashboardFilters } from '@/types';
 
 const TOKEN_KEY = 'crm_tokens';
+const USER_KEY = 'crm_user';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
@@ -39,7 +40,7 @@ api.interceptors.response.use(
     ) {
       // Clear stored credentials and redirect to login
       sessionStorage.removeItem(TOKEN_KEY);
-      sessionStorage.removeItem('crm_user');
+      sessionStorage.removeItem(USER_KEY);
       window.location.href = '/login';
     }
     return Promise.reject(error);

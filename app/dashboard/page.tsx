@@ -7,6 +7,7 @@ import InfluencerCard from '@/components/InfluencerCard';
 import StatsBar from '@/components/StatsBar';
 import FilterBar from '@/components/FilterBar';
 import AddInfluencerModal from '@/components/AddInfluencerModal';
+import UserMenu from '@/components/UserMenu';
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -79,13 +80,16 @@ export default function DashboardPage() {
             <h1 className="text-xl font-bold text-gray-900">Influencer CRM</h1>
             <p className="text-sm text-gray-500">Manage your influencer partnerships</p>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
-          >
-            <span>+</span>
-            <span>Add Influencer</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+            >
+              <span>+</span>
+              <span>Add Influencer</span>
+            </button>
+            <UserMenu />
+          </div>
         </div>
       </header>
 

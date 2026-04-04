@@ -14,20 +14,20 @@ const nextConfig = {
 
   // ─── Security headers (F-004) ──────────────────────────────────────────
   async headers() {
-    // Build CSP value — report-only while tuning; swap to enforce later.
+    // Build CSP value — enforced mode.
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const reportUri = process.env.CSP_REPORT_URI || '/api/csp-report';
     const cspValue = [
       "default-src 'self'",
       "script-src 'self'",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self'",
       "img-src 'self' https: data:",
       `connect-src 'self' ${apiUrl}`,
       "frame-ancestors 'none'",
+      `report-uri ${reportUri}`,
     ].join('; ');
 
-    // To enforce CSP, change the header key below from
-    // "Content-Security-Policy-Report-Only" to "Content-Security-Policy".
-    const cspHeaderName = 'Content-Security-Policy-Report-Only';
+    const cspHeaderName = 'Content-Security-Policy';
 
     return [
       {

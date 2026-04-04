@@ -9,47 +9,14 @@ import {
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import type { User, AuthTokens, LoginCredentials, Role } from '@/types';
+import type { User, LoginCredentials, Role } from '@/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+// Tokens are now stored as httpOnly cookies set by the backend.
+// Only the user profile (non-sensitive) is kept in sessionStorage for
+// client-side UI state rehydration.
 
-const TOKEN_KEY = 'crm_tokens';
 const USER_KEY = 'crm_user';
-const COOKIE_NAME = 'crm_access_token';
-const IS_SECURE = typeof window !== 'undefined' && window.location.protocol === 'https:';
-
-function persistTokens(tokens: AuthTokens): void {
-  try {
-    sessionStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
-    // Also set an HTTP cookie so the Next.js edge middleware can guard routes.
-    // The cookie is SameSite=Strict to mitigate CSRF (F-006).
-    const secureFlag = IS_SECURE ? '; Secure' : '';
-    document.cookie = `${COOKIE_NAME}=${encodeURIComponent(tokens.accessToken)}; path=/; SameSite=Strict${secureFlag}`;
-  } catch {
-    // Storage full or unavailable – continue without persistence
-  }
-}
-
-function loadTokens(): AuthTokens | null {
-  try {
-    const raw = sessionStorage.getItem(TOKEN_KEY);
-    return raw ? (JSON.parse(raw) as AuthTokens) : null;
-  } catch {
-    return null;
-  }
-}
-
-function clearTokens(): void {
-  try {
-    sessionStorage.removeItem(TOKEN_KEY);
-    sessionStorage.removeItem(USER_KEY);
-    // Remove the route-guard cookie
-    const secureFlag = IS_SECURE ? '; Secure' : '';
-    document.cookie = `${COOKIE_NAME}=; path=/; max-age=0; SameSite=Strict${secureFlag}`;
-  } catch {
-    // Ignore
-  }
-}
 
 function persistUser(user: User): void {
   try {
@@ -68,15 +35,22 @@ function loadUser(): User | null {
   }
 }
 
+function clearUser(): void {
+  try {
+    sessionStorage.removeItem(USER_KEY);
+  } catch {
+    // Ignore
+  }
+}
+
 // ─── Context type ──────────────────────────────────────────────────────────
 
 interface AuthContextValue {
   user: User | null;
-  tokens: AuthTokens | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   hasRole: (requiredRole: Role) => boolean;
 }
 
@@ -95,19 +69,19 @@ const ROLE_HIERARCHY: Record<Role, number> = {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [tokens, setTokens] = useState<AuthTokens | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Rehydrate from sessionStorage on mount
+  // Rehydrate user from sessionStorage on mount.
+  // SSR-safe: must run after hydration to avoid server/client mismatch.
+  /* eslint-disable react-hooks/set-state-in-effect -- One-time post-hydration init from browser sessionStorage */
   useEffect(() => {
-    const storedTokens = loadTokens();
     const storedUser = loadUser();
-    if (storedTokens && storedUser) {
-      setTokens(storedTokens);
+    if (storedUser) {
       setUser(storedUser);
     }
     setIsLoading(false);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const login = useCallback(
     async (credentials: LoginCredentials) => {
@@ -117,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(credentials),
       });
 
@@ -127,20 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      const data = (await res.json()) as {
-        user: User;
-        accessToken: string;
-        refreshToken: string;
-      };
-
-      const newTokens: AuthTokens = {
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-      };
+      const data = (await res.json()) as { user: User };
 
       setUser(data.user);
-      setTokens(newTokens);
-      persistTokens(newTokens);
       persistUser(data.user);
 
       router.push('/dashboard');
@@ -148,10 +112,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [router]
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+    try {
+      await fetch(`${apiUrl}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Best-effort logout call; proceed with local cleanup
+    }
+
     setUser(null);
-    setTokens(null);
-    clearTokens();
+    clearUser();
     router.push('/login');
   }, [router]);
 
@@ -167,8 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        tokens,
-        isAuthenticated: !!user && !!tokens,
+        isAuthenticated: !!user,
         isLoading,
         login,
         logout,

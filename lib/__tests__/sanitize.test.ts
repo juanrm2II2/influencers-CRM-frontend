@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { sanitizeText } from '../sanitize';
 
 describe('sanitizeText', () => {
@@ -49,5 +49,45 @@ describe('sanitizeText', () => {
 
   it('strips iframe tags', () => {
     expect(sanitizeText('<iframe src="evil.com"></iframe>safe')).toBe('safe');
+  });
+});
+
+describe('sanitizeText (SSR fallback)', () => {
+  const originalWindow = globalThis.window;
+
+  afterEach(() => {
+    // Restore window after each test
+    Object.defineProperty(globalThis, 'window', {
+      value: originalWindow,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  it('returns input as-is when window is undefined (SSR)', () => {
+    // Simulate SSR by removing window
+    const saved = globalThis.window;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).window = undefined;
+
+    // In SSR, React's JSX escaping handles XSS prevention
+    expect(sanitizeText('plain text')).toBe('plain text');
+    expect(sanitizeText('<script>alert(1)</script>')).toBe('<script>alert(1)</script>');
+
+    // Restore
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).window = saved;
+  });
+
+  it('returns empty string for empty input in SSR', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const saved = globalThis.window;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).window = undefined;
+
+    expect(sanitizeText('')).toBe('');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).window = saved;
   });
 });

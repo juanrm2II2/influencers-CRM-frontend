@@ -11,11 +11,8 @@ export function sanitizeText(input: string): string {
   // On the server (SSR), DOMPurify requires a DOM; skip and rely on React escaping.
   if (typeof window === 'undefined') return input;
 
-  // DOMPurify.sanitize returns HTML-safe output (entities encoded).
-  // Since we render in React JSX text nodes (which escape again), decode entities
-  // to avoid double-encoding (e.g. "&amp;amp;").
-  const sanitized = DOMPurify.sanitize(input, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
-  const el = document.createElement('span');
-  el.innerHTML = sanitized;
-  return el.textContent ?? '';
+  // RETURN_DOM gives us a DOM element directly; extracting textContent
+  // strips all tags and decodes entities without using innerHTML.
+  const clean = DOMPurify.sanitize(input, { RETURN_DOM: true });
+  return clean.textContent ?? '';
 }

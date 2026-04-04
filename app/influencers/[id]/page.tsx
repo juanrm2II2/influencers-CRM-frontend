@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { getInfluencer, updateInfluencer, deleteInfluencer } from '@/lib/api';
+import { sanitizeText } from '@/lib/sanitize';
 import { Influencer, Outreach, Status } from '@/types';
 import StatusBadge from '@/components/StatusBadge';
 import PlatformIcon from '@/components/PlatformIcon';
@@ -79,8 +80,10 @@ export default function InfluencerDetailPage() {
     if (!influencer || notes === influencer.notes) return;
     setSavingNotes(true);
     try {
-      await updateInfluencer(id, { notes });
-      setInfluencer((prev) => (prev ? { ...prev, notes } : prev));
+      const sanitizedNotes = sanitizeText(notes);
+      await updateInfluencer(id, { notes: sanitizedNotes });
+      setNotes(sanitizedNotes);
+      setInfluencer((prev) => (prev ? { ...prev, notes: sanitizedNotes } : prev));
     } catch {
       // silently fail notes save
     } finally {
@@ -177,7 +180,7 @@ export default function InfluencerDetailPage() {
                 </a>
               )}
               {influencer.bio && (
-                <p className="text-gray-600 text-sm mt-3 leading-relaxed">{influencer.bio}</p>
+                <p className="text-gray-600 text-sm mt-3 leading-relaxed">{sanitizeText(influencer.bio)}</p>
               )}
               {influencer.niche && (
                 <span className="inline-block mt-3 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
@@ -300,14 +303,14 @@ export default function InfluencerDetailPage() {
                         <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
                           Message Sent
                         </p>
-                        <p className="text-sm text-gray-700 mt-0.5">{item.message_sent}</p>
+                        <p className="text-sm text-gray-700 mt-0.5">{sanitizeText(item.message_sent)}</p>
                       </div>
                       {item.response && (
                         <div>
                           <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
                             Response
                           </p>
-                          <p className="text-sm text-gray-700 mt-0.5">{item.response}</p>
+                          <p className="text-sm text-gray-700 mt-0.5">{sanitizeText(item.response)}</p>
                         </div>
                       )}
                       {item.follow_up_date && (

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { logOutreach } from '@/lib/api';
+import { sanitizeText } from '@/lib/sanitize';
 import { Channel, Outreach } from '@/types';
 
 const CHANNELS: Channel[] = ['email', 'dm', 'telegram'];
@@ -30,8 +31,8 @@ export default function LogOutreachModal({ influencerId, onClose, onSuccess }: P
       const outreach = await logOutreach(influencerId, {
         contact_date: contactDate,
         channel,
-        message_sent: messageSent,
-        response: response || undefined,
+        message_sent: sanitizeText(messageSent),
+        response: response ? sanitizeText(response) : undefined,
         follow_up_date: followUpDate || undefined,
       });
       onSuccess(outreach);

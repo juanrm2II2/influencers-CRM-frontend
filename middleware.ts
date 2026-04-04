@@ -16,6 +16,25 @@ const SECURITY_HEADERS: Record<string, string> = {
     'max-age=63072000; includeSubDomains; preload',
 };
 
+// ─── Content Security Policy (CSP) ─────────────────────────────────────────
+// Start in report-only mode to monitor violations without blocking resources.
+// Once confident no legitimate resources are blocked, switch the header name
+// from "Content-Security-Policy-Report-Only" to "Content-Security-Policy".
+const CSP_HEADER_NAME = 'Content-Security-Policy-Report-Only';
+
+function buildCspHeaderValue(): string {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const directives = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' https: data:",
+    `connect-src 'self' ${apiUrl}`,
+    "frame-ancestors 'none'",
+  ];
+  return directives.join('; ');
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -65,6 +84,7 @@ function applySecurityHeaders(response: NextResponse): void {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
     response.headers.set(key, value);
   }
+  response.headers.set(CSP_HEADER_NAME, buildCspHeaderValue());
 }
 
 export const config = {

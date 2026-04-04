@@ -21,13 +21,14 @@ export default function UserMenu() {
 
   if (!user) return null;
 
-  const initials = user.name
-    .split(' ')
-    .filter(Boolean)
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+  const initials =
+    user.name
+      .split(' ')
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || user.email[0]?.toUpperCase() || '?';
 
   return (
     <div ref={menuRef} className="relative">

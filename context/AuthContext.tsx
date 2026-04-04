@@ -71,7 +71,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Rehydrate user from sessionStorage on mount
+  // Rehydrate user from sessionStorage on mount.
+  // SSR-safe: must run after hydration to avoid server/client mismatch.
+  /* eslint-disable react-hooks/set-state-in-effect -- One-time post-hydration init from browser sessionStorage */
   useEffect(() => {
     const storedUser = loadUser();
     if (storedUser) {
@@ -79,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setIsLoading(false);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const login = useCallback(
     async (credentials: LoginCredentials) => {

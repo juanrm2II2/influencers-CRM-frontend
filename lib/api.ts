@@ -1,9 +1,51 @@
 import axios from 'axios';
 import { Influencer, Outreach, DashboardFilters } from '@/types';
 
+const TOKEN_KEY = 'crm_tokens';
+const USER_KEY = 'crm_user';
+
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
 });
+
+// ─── Request interceptor: attach Authorization header ──────────────────────
+
+api.interceptors.request.use((config) => {
+  try {
+    const raw =
+      typeof window !== 'undefined'
+        ? sessionStorage.getItem(TOKEN_KEY)
+        : null;
+    if (raw) {
+      const { accessToken } = JSON.parse(raw) as { accessToken: string };
+      if (accessToken) {
+        config.headers.Authorization = `Bearer ${accessToken}`;
+      }
+    }
+  } catch {
+    // Token unavailable – proceed without auth header
+  }
+  return config;
+});
+
+// ─── Response interceptor: handle 401 Unauthorized ─────────────────────────
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 401 &&
+      typeof window !== 'undefined'
+    ) {
+      // Clear stored credentials and redirect to login
+      sessionStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(USER_KEY);
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 export async function getInfluencers(filters?: DashboardFilters): Promise<Influencer[]> {
   const params: Record<string, string> = {};

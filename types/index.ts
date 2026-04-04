@@ -2,6 +2,34 @@ export type Platform = 'tiktok' | 'instagram' | 'youtube' | 'twitter';
 export type Status = 'prospect' | 'contacted' | 'negotiating' | 'active' | 'declined';
 export type Channel = 'email' | 'dm' | 'telegram';
 
+// ─── Authentication & Authorization types ────────────────────────────────────
+
+export type Role = 'admin' | 'manager' | 'viewer';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  tokens: AuthTokens | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}
+
 export interface Influencer {
   id: string;
   handle: string;

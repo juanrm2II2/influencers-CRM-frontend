@@ -25,7 +25,6 @@ export interface LoginCredentials {
 
 export interface AuthState {
   user: User | null;
-  tokens: AuthTokens | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 }

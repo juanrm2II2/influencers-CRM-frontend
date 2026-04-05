@@ -9,7 +9,7 @@ if (process.env.NODE_ENV === 'production') {
       'Set it to your backend HTTPS URL (e.g. https://api.example.com).'
     );
   }
-  if (!/^https:\/\//i.test(apiUrl)) {
+  if (!/^https:\/\//.test(apiUrl)) {
     throw new Error(
       `NEXT_PUBLIC_API_URL must use HTTPS in production. Received: "${apiUrl}".`
     );

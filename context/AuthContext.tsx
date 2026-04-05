@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import type { User, LoginCredentials, Role } from '@/types';
+import { getCsrfToken, CSRF_HEADER_NAME } from '@/lib/csrf';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 // Tokens are now stored as httpOnly cookies set by the backend.
@@ -88,9 +89,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const apiUrl =
         process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+      const csrfToken = getCsrfToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : {}),
+      };
+
       const res = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         credentials: 'include',
         body: JSON.stringify(credentials),
       });
@@ -117,9 +124,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
     try {
+      const csrfToken = getCsrfToken();
       await fetch(`${apiUrl}/api/auth/logout`, {
         method: 'POST',
         credentials: 'include',
+        headers: csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : {},
       });
     } catch {
       // Best-effort logout call; proceed with local cleanup

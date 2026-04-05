@@ -1,11 +1,28 @@
 import axios from 'axios';
 import { Influencer, Outreach, DashboardFilters } from '@/types';
+import { getCsrfToken, CSRF_HEADER_NAME, CSRF_METHODS } from '@/lib/csrf';
 
 const USER_KEY = 'crm_user';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
   withCredentials: true, // Send httpOnly cookies with every request
+});
+
+// ─── Request interceptor: attach CSRF token ────────────────────────────────
+// For every state-changing request the backend expects the CSRF token (set in
+// the XSRF-TOKEN cookie) to be echoed back in the X-XSRF-TOKEN header
+// (Double Submit Cookie pattern).
+
+api.interceptors.request.use((config) => {
+  const method = (config.method ?? '').toLowerCase();
+  if (CSRF_METHODS.has(method)) {
+    const token = getCsrfToken();
+    if (token) {
+      config.headers[CSRF_HEADER_NAME] = token;
+    }
+  }
+  return config;
 });
 
 // ─── Response interceptor: handle 401 Unauthorized ─────────────────────────

@@ -86,8 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (credentials: LoginCredentials) => {
       const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL ||
-        (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001');
+        process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
       const res = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
@@ -115,8 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL ||
-      (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001');
+      process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
     try {
       await fetch(`${apiUrl}/api/auth/logout`, {

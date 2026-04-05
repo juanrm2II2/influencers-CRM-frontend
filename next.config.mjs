@@ -33,9 +33,7 @@ const nextConfig = {
   // ─── Security headers (F-004) ──────────────────────────────────────────
   async headers() {
     // Build CSP value — enforced mode.
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL ||
-      (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001');
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
     const reportUri = process.env.CSP_REPORT_URI || '/api/csp-report';
     const cspValue = [
       "default-src 'self'",

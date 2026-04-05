@@ -4,7 +4,9 @@ import { Influencer, Outreach, DashboardFilters } from '@/types';
 const USER_KEY = 'crm_user';
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+  baseURL:
+    process.env.NEXT_PUBLIC_API_URL ||
+    (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001'),
   withCredentials: true, // Send httpOnly cookies with every request
 });
 

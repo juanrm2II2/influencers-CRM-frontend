@@ -22,7 +22,9 @@ const SECURITY_HEADERS: Record<string, string> = {
 const CSP_HEADER_NAME = 'Content-Security-Policy';
 
 function buildCspHeaderValue(): string {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ||
+    (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001');
   const reportUri = process.env.CSP_REPORT_URI || '/api/csp-report';
   const directives = [
     "default-src 'self'",

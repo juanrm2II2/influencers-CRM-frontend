@@ -29,8 +29,8 @@ describe('DashboardError', () => {
 
   it('renders a link to dashboard', () => {
     render(<DashboardError error={mockError} reset={mockReset} />);
-    const link = screen.getByRole('link', { name: /go to dashboard/i });
-    expect(link).toHaveAttribute('href', '/dashboard');
+    const link = screen.getByRole('link', { name: /go to home/i });
+    expect(link).toHaveAttribute('href', '/');
   });
 
   it('logs the error to console', () => {

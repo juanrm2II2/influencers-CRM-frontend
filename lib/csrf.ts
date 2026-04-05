@@ -21,7 +21,7 @@ export function getCookieValue(name: string): string | undefined {
   if (typeof document === 'undefined') return undefined;
 
   const match = document.cookie
-    .split('; ')
+    .split(/;\s*/)
     .find((row) => row.startsWith(`${name}=`));
 
   return match ? decodeURIComponent(match.substring(name.length + 1)) : undefined;

@@ -44,7 +44,7 @@ export class RateLimiter {
 
     if (timestamps.length >= this.limit) {
       // Still over limit after pruning — reject.
-      this.hits.set(key, timestamps);
+      // Only update stored timestamps when pruning removed entries.
       return false;
     }
 

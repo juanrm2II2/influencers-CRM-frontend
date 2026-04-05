@@ -19,6 +19,8 @@ const ALLOWED_CONTENT_TYPES = [
   'application/json',
 ];
 
+const encoder = new TextEncoder();
+
 function getClientIp(request: Request): string {
   const headers = request.headers;
   // Vercel / common reverse-proxy headers
@@ -60,7 +62,7 @@ export async function POST(request: Request) {
   // ── Body size limit ──────────────────────────────────────────────────────
   const rawBody = await request.text();
 
-  if (new TextEncoder().encode(rawBody).length > MAX_BODY_BYTES) {
+  if (encoder.encode(rawBody).length > MAX_BODY_BYTES) {
     return new NextResponse(
       JSON.stringify({ error: 'Payload Too Large' }),
       {

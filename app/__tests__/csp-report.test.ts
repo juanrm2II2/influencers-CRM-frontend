@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { POST, cspRateLimiter } from '../../app/api/csp-report/route';
+import { POST } from '../../app/api/csp-report/route';
+import { cspRateLimiter } from '../../lib/csp-rate-limiter';
 
 /** Helper to build a Request with sensible defaults for CSP reports. */
 function buildRequest(

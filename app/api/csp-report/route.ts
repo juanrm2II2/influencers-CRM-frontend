@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { RateLimiter } from '@/lib/rate-limit';
+import { cspRateLimiter } from '@/lib/csp-rate-limiter';
 
 /**
  * POST /api/csp-report
@@ -18,12 +18,6 @@ const ALLOWED_CONTENT_TYPES = [
   'application/csp-report',
   'application/json',
 ];
-
-/** Shared rate-limiter instance (per process). */
-export const cspRateLimiter = new RateLimiter({
-  limit: 10,
-  windowMs: 60_000, // 1 minute
-});
 
 function getClientIp(request: Request): string {
   const headers = request.headers;

@@ -23,6 +23,11 @@ global.fetch = mockFetch;
 function TestConsumer({ action }: { action?: string }) {
   const { user, isAuthenticated, isLoading, login, logout, hasRole } = useAuth();
 
+  // Catch expected login failures so they don't surface as unhandled rejections
+  const handleLogin = () => {
+    login({ email: 'test@example.com', password: 'password123' }).catch(() => {});
+  };
+
   return (
     <div>
       <span data-testid="loading">{String(isLoading)}</span>
@@ -32,7 +37,7 @@ function TestConsumer({ action }: { action?: string }) {
       <span data-testid="has-manager">{String(hasRole('manager'))}</span>
       <span data-testid="has-viewer">{String(hasRole('viewer'))}</span>
       {action === 'login' && (
-        <button onClick={() => { login({ email: 'test@example.com', password: 'password123' }).catch(() => {}); }}>
+        <button onClick={handleLogin}>
           Login
         </button>
       )}

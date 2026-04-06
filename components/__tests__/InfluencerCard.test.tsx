@@ -20,6 +20,7 @@ vi.mock('next/image', () => ({
 
 const baseInfluencer: Influencer = {
   id: '1',
+  user_id: 'u1',
   handle: 'testuser',
   platform: 'instagram',
   full_name: 'Test User',

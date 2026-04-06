@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthProvider, useAuth } from '../AuthContext';
 import type { ReactNode } from 'react';
@@ -15,9 +15,23 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-// Mock fetch globally
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+// ── Supabase client mock ────────────────────────────────────────────────────
+
+const mockSignIn = vi.fn();
+const mockSignOut = vi.fn();
+const mockGetUser = vi.fn();
+const mockOnAuthStateChange = vi.fn();
+
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    auth: {
+      signInWithPassword: mockSignIn,
+      signOut: mockSignOut,
+      getUser: mockGetUser,
+      onAuthStateChange: mockOnAuthStateChange,
+    },
+  }),
+}));
 
 // Test component that exposes auth context
 function TestConsumer({ action }: { action?: string }) {
@@ -52,6 +66,12 @@ describe('AuthContext', () => {
     vi.clearAllMocks();
     sessionStorage.clear();
     mockPush.mockClear();
+
+    // Default: no active session
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+    mockOnAuthStateChange.mockReturnValue({
+      data: { subscription: { unsubscribe: vi.fn() } },
+    });
   });
 
   afterEach(() => {
@@ -60,7 +80,6 @@ describe('AuthContext', () => {
 
   describe('useAuth outside provider', () => {
     it('throws when used outside AuthProvider', () => {
-      // Suppress console.error for this test
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
       expect(() => {
         render(<TestConsumer />);
@@ -72,19 +91,42 @@ describe('AuthContext', () => {
   describe('initial state', () => {
     it('starts with isLoading true and no user', () => {
       renderWithProvider(<TestConsumer />);
-      // After first render, useEffect fires and sets isLoading false
       expect(screen.getByTestId('user').textContent).toBe('null');
     });
 
-    it('rehydrates user from sessionStorage', async () => {
+    it('rehydrates user from sessionStorage, then verifies with Supabase', async () => {
       const storedUser = { id: '1', email: 'test@example.com', name: 'Test', role: 'admin' };
       sessionStorage.setItem('crm_user', JSON.stringify(storedUser));
+
+      // Supabase confirms the session
+      mockGetUser.mockResolvedValue({
+        data: {
+          user: {
+            id: '1',
+            email: 'test@example.com',
+            user_metadata: { name: 'Test', role: 'admin' },
+          },
+        },
+      });
 
       renderWithProvider(<TestConsumer />);
 
       await waitFor(() => {
         expect(screen.getByTestId('authenticated').textContent).toBe('true');
         expect(screen.getByTestId('user').textContent).toContain('test@example.com');
+      });
+    });
+
+    it('clears user when Supabase says no session', async () => {
+      const storedUser = { id: '1', email: 'test@example.com', name: 'Test', role: 'admin' };
+      sessionStorage.setItem('crm_user', JSON.stringify(storedUser));
+      mockGetUser.mockResolvedValue({ data: { user: null } });
+
+      renderWithProvider(<TestConsumer />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading').textContent).toBe('false');
+        expect(screen.getByTestId('authenticated').textContent).toBe('false');
       });
     });
 
@@ -102,11 +144,12 @@ describe('AuthContext', () => {
 
   describe('login', () => {
     it('authenticates user and navigates to dashboard', async () => {
-      const userObj = { id: '1', email: 'test@example.com', name: 'Test User', role: 'admin' };
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ user: userObj }),
-      });
+      const supabaseUser = {
+        id: '1',
+        email: 'test@example.com',
+        user_metadata: { name: 'Test User', role: 'admin' },
+      };
+      mockSignIn.mockResolvedValueOnce({ data: { user: supabaseUser }, error: null });
 
       const user = userEvent.setup();
       renderWithProvider(<TestConsumer action="login" />);
@@ -120,36 +163,14 @@ describe('AuthContext', () => {
       expect(sessionStorage.getItem('crm_user')).toBeTruthy();
     });
 
-    it('throws on failed login with server message', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 401,
-        json: async () => ({ message: 'Invalid credentials' }),
+    it('throws on failed login with Supabase error', async () => {
+      mockSignIn.mockResolvedValueOnce({
+        data: { user: null },
+        error: { message: 'Invalid credentials' },
       });
 
       const user = userEvent.setup();
-      // Suppress console.error for unhandled rejection
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      renderWithProvider(<TestConsumer action="login" />);
-      await user.click(screen.getByText('Login'));
-
-      // The login promise rejection is handled by the component
-      await waitFor(() => {
-        expect(screen.getByTestId('authenticated').textContent).toBe('false');
-      });
-      spy.mockRestore();
-    });
-
-    it('throws generic message when server provides no body', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        json: async () => { throw new Error('no json'); },
-      });
-
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const user = userEvent.setup();
 
       renderWithProvider(<TestConsumer action="login" />);
       await user.click(screen.getByText('Login'));
@@ -165,7 +186,7 @@ describe('AuthContext', () => {
     it('clears user and navigates to login', async () => {
       const storedUser = { id: '1', email: 'test@example.com', name: 'Test', role: 'admin' };
       sessionStorage.setItem('crm_user', JSON.stringify(storedUser));
-      mockFetch.mockResolvedValueOnce({ ok: true });
+      mockSignOut.mockResolvedValueOnce({ error: null });
 
       const user = userEvent.setup();
       renderWithProvider(<TestConsumer action="logout" />);
@@ -184,10 +205,10 @@ describe('AuthContext', () => {
       expect(sessionStorage.getItem('crm_user')).toBeNull();
     });
 
-    it('still clears local state if logout API fails', async () => {
+    it('still clears local state if signOut fails', async () => {
       const storedUser = { id: '1', email: 'test@example.com', name: 'Test', role: 'manager' };
       sessionStorage.setItem('crm_user', JSON.stringify(storedUser));
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockSignOut.mockRejectedValueOnce(new Error('Network error'));
 
       const user = userEvent.setup();
       renderWithProvider(<TestConsumer action="logout" />);

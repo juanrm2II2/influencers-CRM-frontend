@@ -13,11 +13,6 @@ export interface User {
   role: Role;
 }
 
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-}
-
 export interface LoginCredentials {
   email: string;
   password: string;
@@ -31,6 +26,7 @@ export interface AuthState {
 
 export interface Influencer {
   id: string;
+  user_id: string;
   handle: string;
   platform: Platform;
   full_name: string;

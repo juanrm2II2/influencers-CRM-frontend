@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { sanitizeText } from '../sanitize';
 
 describe('sanitizeText', () => {
@@ -80,7 +80,6 @@ describe('sanitizeText (SSR fallback)', () => {
   });
 
   it('returns empty string for empty input in SSR', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const saved = globalThis.window;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (globalThis as any).window = undefined;

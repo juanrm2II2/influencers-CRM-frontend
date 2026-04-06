@@ -29,6 +29,7 @@ export async function getInfluencers(filters?: DashboardFilters): Promise<Influe
 
   const { data, error } = await query.order('created_at', { ascending: false });
   if (error) {
+    // PGRST301: JWT expired or invalid — clear session and redirect to login
     if (error.code === 'PGRST301') clearSessionAndRedirect();
     throw new Error(error.message);
   }
@@ -44,6 +45,7 @@ export async function getInfluencer(id: string): Promise<Influencer> {
     .single();
 
   if (error) {
+    // PGRST301: JWT expired or invalid — clear session and redirect to login
     if (error.code === 'PGRST301') clearSessionAndRedirect();
     throw new Error(error.message);
   }

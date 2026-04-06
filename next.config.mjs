@@ -38,14 +38,17 @@ const nextConfig = {
   // ─── Security headers (F-004) ──────────────────────────────────────────
   async headers() {
     // Build CSP value — enforced mode.
+    // All Supabase services (REST, Auth, Storage, Functions) use the project URL.
+    // Realtime uses WebSockets, so include the wss:// variant.
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+    const supabaseWs = supabaseUrl.replace(/^https:\/\//, 'wss://');
     const reportUri = process.env.CSP_REPORT_URI || '/api/csp-report';
     const cspValue = [
       "default-src 'self'",
       "script-src 'self'",
       "style-src 'self'",
       "img-src 'self' https: data:",
-      `connect-src 'self' ${supabaseUrl}`,
+      `connect-src 'self' ${supabaseUrl} ${supabaseWs}`,
       "frame-ancestors 'none'",
       `report-uri ${reportUri}`,
     ].join('; ');

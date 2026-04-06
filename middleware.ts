@@ -24,13 +24,15 @@ const CSP_HEADER_NAME = 'Content-Security-Policy';
 
 function buildCspHeaderValue(): string {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+  // Derive wss:// URL for Supabase Realtime (WebSocket) connections
+  const supabaseWs = supabaseUrl.replace(/^https:\/\//, 'wss://');
   const reportUri = process.env.CSP_REPORT_URI || '/api/csp-report';
   const directives = [
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self'",
     "img-src 'self' https: data:",
-    `connect-src 'self' ${supabaseUrl}`,
+    `connect-src 'self' ${supabaseUrl} ${supabaseWs}`,
     "frame-ancestors 'none'",
     `report-uri ${reportUri}`,
   ];

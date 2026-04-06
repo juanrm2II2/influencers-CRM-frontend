@@ -15,12 +15,15 @@ import type { User, LoginCredentials, Role } from '@/types';
 // ─── Helpers ────────────────────────────────────────────────────────────────
 // Only the user profile (non-sensitive) is kept in sessionStorage for
 // client-side UI state rehydration between navigations.
+// Auth tokens are NOT stored here; Supabase manages them in httpOnly cookies.
 
 const USER_KEY = 'crm_user';
 
+/** Persist non-sensitive display fields only (no tokens or secrets). */
 function persistUser(user: User): void {
   try {
-    sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+    const { id, name, role } = user;
+    sessionStorage.setItem(USER_KEY, JSON.stringify({ id, email: user.email, name, role }));
   } catch {
     // Ignore
   }

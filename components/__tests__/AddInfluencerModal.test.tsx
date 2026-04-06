@@ -14,7 +14,6 @@ const mockOnSuccess = vi.fn();
 
 const mockInfluencer: Influencer = {
   id: '1',
-  user_id: 'u1',
   handle: 'cristiano',
   platform: 'instagram',
   full_name: 'Cristiano Ronaldo',

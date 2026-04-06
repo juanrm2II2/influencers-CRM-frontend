@@ -27,27 +27,11 @@ vi.mock('@/lib/api', () => ({
   logOutreach: vi.fn(),
 }));
 
-// ── Supabase client mock ────────────────────────────────────────────────────
-
-const mockSignIn = vi.fn();
-const mockSignOut = vi.fn();
-const mockGetUser = vi.fn();
-const mockOnAuthStateChange = vi.fn();
-
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    auth: {
-      signInWithPassword: mockSignIn,
-      signOut: mockSignOut,
-      getUser: mockGetUser,
-      onAuthStateChange: mockOnAuthStateChange,
-    },
-  }),
-}));
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 const mockInfluencer: Influencer = {
   id: '1',
-  user_id: 'u1',
   handle: 'testuser',
   platform: 'instagram',
   full_name: 'Test User',
@@ -97,12 +81,6 @@ describe('Integration: Auth flow + CRUD', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
-
-    // Default: no active session
-    mockGetUser.mockResolvedValue({ data: { user: null } });
-    mockOnAuthStateChange.mockReturnValue({
-      data: { subscription: { unsubscribe: vi.fn() } },
-    });
   });
 
   afterEach(() => {
@@ -110,14 +88,13 @@ describe('Integration: Auth flow + CRUD', () => {
   });
 
   it('complete auth flow: login → CRUD operations → logout', async () => {
-    const supabaseUser = {
-      id: '1',
-      email: 'test@example.com',
-      user_metadata: { name: 'Test User', role: 'admin' },
-    };
+    const userObj = { id: '1', email: 'test@example.com', name: 'Test User', role: 'admin' };
 
-    // Mock successful Supabase login
-    mockSignIn.mockResolvedValueOnce({ data: { user: supabaseUser }, error: null });
+    // Mock successful login
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ user: userObj }),
+    });
 
     // Mock CRUD operations
     vi.mocked(api.getInfluencers).mockResolvedValueOnce([mockInfluencer]);
@@ -126,7 +103,7 @@ describe('Integration: Auth flow + CRUD', () => {
     vi.mocked(api.deleteInfluencer).mockResolvedValueOnce(undefined);
 
     // Mock logout
-    mockSignOut.mockResolvedValueOnce({ error: null });
+    mockFetch.mockResolvedValueOnce({ ok: true });
 
     const user = userEvent.setup();
 
@@ -176,9 +153,10 @@ describe('Integration: Auth flow + CRUD', () => {
   });
 
   it('login failure does not authenticate user', async () => {
-    mockSignIn.mockResolvedValueOnce({
-      data: { user: null },
-      error: { message: 'Bad credentials' },
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ message: 'Bad credentials' }),
     });
 
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -207,17 +185,6 @@ describe('Integration: Auth flow + CRUD', () => {
   it('session rehydration: user persists across re-renders', async () => {
     const userObj = { id: '1', email: 'test@example.com', name: 'Rehydrated User', role: 'manager' };
     sessionStorage.setItem('crm_user', JSON.stringify(userObj));
-
-    // Supabase confirms the session is still valid
-    mockGetUser.mockResolvedValue({
-      data: {
-        user: {
-          id: '1',
-          email: 'test@example.com',
-          user_metadata: { name: 'Rehydrated User', role: 'manager' },
-        },
-      },
-    });
 
     render(
       <AuthProvider>

@@ -37,7 +37,6 @@ vi.mock('next/image', () => ({
 const mockInfluencers: Influencer[] = [
   {
     id: '1',
-    user_id: 'u1',
     handle: 'user1',
     platform: 'instagram',
     full_name: 'User One',
@@ -57,7 +56,6 @@ const mockInfluencers: Influencer[] = [
   },
   {
     id: '2',
-    user_id: 'u1',
     handle: 'user2',
     platform: 'tiktok',
     full_name: 'User Two',

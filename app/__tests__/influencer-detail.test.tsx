@@ -62,7 +62,6 @@ const mockOutreach: Outreach = {
 
 const mockInfluencer: Influencer = {
   id: 'inf1',
-  user_id: 'u1',
   handle: 'cristiano',
   platform: 'instagram',
   full_name: 'Cristiano Ronaldo',

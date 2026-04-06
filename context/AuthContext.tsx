@@ -9,21 +9,18 @@ import {
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import type { User, LoginCredentials, Role } from '@/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+// Tokens are now stored as httpOnly cookies set by the backend.
 // Only the user profile (non-sensitive) is kept in sessionStorage for
-// client-side UI state rehydration between navigations.
-// Auth tokens are NOT stored here; Supabase manages them in httpOnly cookies.
+// client-side UI state rehydration.
 
 const USER_KEY = 'crm_user';
 
-/** Persist non-sensitive display fields only (no tokens or secrets). */
 function persistUser(user: User): void {
   try {
-    const { id, name, role } = user;
-    sessionStorage.setItem(USER_KEY, JSON.stringify({ id, email: user.email, name, role }));
+    sessionStorage.setItem(USER_KEY, JSON.stringify(user));
   } catch {
     // Ignore
   }
@@ -67,17 +64,6 @@ const ROLE_HIERARCHY: Record<Role, number> = {
   admin: 2,
 };
 
-// ─── Map Supabase auth user → app User ──────────────────────────────────────
-
-function toAppUser(supabaseUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }): User {
-  return {
-    id: supabaseUser.id,
-    email: supabaseUser.email ?? '',
-    name: (supabaseUser.user_metadata?.name as string) ?? supabaseUser.email ?? '',
-    role: (supabaseUser.user_metadata?.role as Role) ?? 'viewer',
-  };
-}
-
 // ─── Provider ──────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -85,74 +71,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Rehydrate: first from sessionStorage (instant), then verify with Supabase.
-  /* eslint-disable react-hooks/set-state-in-effect -- One-time post-hydration init */
+  // Rehydrate user from sessionStorage on mount.
+  // SSR-safe: must run after hydration to avoid server/client mismatch.
+  /* eslint-disable react-hooks/set-state-in-effect -- One-time post-hydration init from browser sessionStorage */
   useEffect(() => {
     const storedUser = loadUser();
     if (storedUser) {
       setUser(storedUser);
     }
-
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user: sbUser } }) => {
-      if (sbUser) {
-        const appUser = toAppUser(sbUser);
-        setUser(appUser);
-        persistUser(appUser);
-      } else {
-        setUser(null);
-        clearUser();
-      }
-      setIsLoading(false);
-    });
-
-    // Listen for auth state changes (e.g. token refresh, sign out in another tab)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const appUser = toAppUser(session.user);
-        setUser(appUser);
-        persistUser(appUser);
-      } else {
-        setUser(null);
-        clearUser();
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    setIsLoading(false);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const login = useCallback(
     async (credentials: LoginCredentials) => {
-      const supabase = createClient();
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: credentials.email,
-        password: credentials.password,
+      const res = await fetch(`${apiUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(credentials),
       });
 
-      if (error) {
-        throw new Error(error.message);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(
+          body?.message || `Login failed (${res.status})`
+        );
       }
 
-      const appUser = toAppUser(data.user);
-      setUser(appUser);
-      persistUser(appUser);
+      const data = (await res.json()) as { user: User };
+
+      setUser(data.user);
+      persistUser(data.user);
 
       router.push('/dashboard');
     },
-    [router],
+    [router]
   );
 
   const logout = useCallback(async () => {
-    const supabase = createClient();
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
     try {
-      await supabase.auth.signOut();
+      await fetch(`${apiUrl}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
     } catch {
-      // Best-effort; proceed with local cleanup
+      // Best-effort logout call; proceed with local cleanup
     }
 
     setUser(null);
@@ -165,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) return false;
       return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY[requiredRole];
     },
-    [user],
+    [user]
   );
 
   return (

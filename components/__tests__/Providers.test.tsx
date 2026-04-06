@@ -11,17 +11,6 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      onAuthStateChange: vi.fn().mockReturnValue({
-        data: { subscription: { unsubscribe: vi.fn() } },
-      }),
-    },
-  }),
-}));
-
 describe('Providers', () => {
   it('renders children inside AuthProvider', () => {
     render(

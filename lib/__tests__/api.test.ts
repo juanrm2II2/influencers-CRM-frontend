@@ -1,39 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Influencer, Outreach } from '@/types';
 
-// ── Supabase mock helpers ──────────────────────────────────────────────────
+// Create mock methods that we'll configure per test
+const mockGet = vi.fn();
+const mockPost = vi.fn();
+const mockPatch = vi.fn();
+const mockDelete = vi.fn();
 
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
-const mockUpdate = vi.fn();
-const mockDeleteFn = vi.fn();
-const mockEq = vi.fn();
-const mockGte = vi.fn();
-const mockSingle = vi.fn();
-const mockOrder = vi.fn();
-const mockInvoke = vi.fn();
-
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    from: vi.fn().mockReturnValue({
-      select: mockSelect,
-      insert: mockInsert,
-      update: mockUpdate,
-      delete: mockDeleteFn,
-      eq: mockEq,
-      gte: mockGte,
-      single: mockSingle,
-      order: mockOrder,
-    }),
-    functions: {
-      invoke: mockInvoke,
+vi.mock('axios', () => {
+  return {
+    default: {
+      create: () => ({
+        get: mockGet,
+        post: mockPost,
+        patch: mockPatch,
+        delete: mockDelete,
+        interceptors: {
+          request: { use: vi.fn() },
+          response: { use: vi.fn() },
+        },
+      }),
+      isAxiosError: vi.fn(),
     },
-  }),
-}));
+  };
+});
 
 const mockInfluencer: Influencer = {
   id: '1',
-  user_id: 'u1',
   handle: 'testuser',
   platform: 'instagram',
   full_name: 'Test User',
@@ -70,24 +63,19 @@ describe('lib/api', () => {
 
   describe('getInfluencers', () => {
     it('fetches all influencers without filters', async () => {
-      // Setup chain: from().select().order() → resolves
-      mockSelect.mockReturnValue({ eq: mockEq, gte: mockGte, order: mockOrder });
-      mockOrder.mockResolvedValue({ data: [mockInfluencer], error: null });
-
+      mockGet.mockResolvedValue({ data: [mockInfluencer] });
       const { getInfluencers } = await import('../api');
+
       const result = await getInfluencers();
 
-      expect(mockOrder).toHaveBeenCalledWith('created_at', { ascending: false });
+      expect(mockGet).toHaveBeenCalledWith('/api/influencers', { params: {} });
       expect(result).toEqual([mockInfluencer]);
     });
 
     it('passes filter params correctly', async () => {
-      mockSelect.mockReturnValue({ eq: mockEq, gte: mockGte, order: mockOrder });
-      mockEq.mockReturnValue({ eq: mockEq, gte: mockGte, order: mockOrder });
-      mockGte.mockReturnValue({ eq: mockEq, gte: mockGte, order: mockOrder });
-      mockOrder.mockResolvedValue({ data: [], error: null });
-
+      mockGet.mockResolvedValue({ data: [] });
       const { getInfluencers } = await import('../api');
+
       await getInfluencers({
         platform: 'instagram',
         status: 'active',
@@ -95,99 +83,100 @@ describe('lib/api', () => {
         min_followers: '1000',
       });
 
-      expect(mockEq).toHaveBeenCalledWith('platform', 'instagram');
-      expect(mockEq).toHaveBeenCalledWith('status', 'active');
-      expect(mockEq).toHaveBeenCalledWith('niche', 'tech');
-      expect(mockGte).toHaveBeenCalledWith('followers', 1000);
+      expect(mockGet).toHaveBeenCalledWith('/api/influencers', {
+        params: {
+          platform: 'instagram',
+          status: 'active',
+          niche: 'tech',
+          min_followers: '1000',
+        },
+      });
     });
 
-    it('throws on Supabase error', async () => {
-      mockSelect.mockReturnValue({ eq: mockEq, gte: mockGte, order: mockOrder });
-      mockOrder.mockResolvedValue({ data: null, error: { message: 'RLS denied', code: '42501' } });
-
+    it('omits undefined filter values', async () => {
+      mockGet.mockResolvedValue({ data: [] });
       const { getInfluencers } = await import('../api');
-      await expect(getInfluencers()).rejects.toThrow('RLS denied');
+
+      await getInfluencers({ platform: 'tiktok' });
+
+      expect(mockGet).toHaveBeenCalledWith('/api/influencers', {
+        params: { platform: 'tiktok' },
+      });
     });
   });
 
   describe('getInfluencer', () => {
     it('fetches a single influencer by id', async () => {
-      mockSelect.mockReturnValue({ eq: mockEq });
-      mockEq.mockReturnValue({ single: mockSingle });
-      mockSingle.mockResolvedValue({ data: mockInfluencer, error: null });
-
+      mockGet.mockResolvedValue({ data: mockInfluencer });
       const { getInfluencer } = await import('../api');
+
       const result = await getInfluencer('1');
 
-      expect(mockEq).toHaveBeenCalledWith('id', '1');
+      expect(mockGet).toHaveBeenCalledWith('/api/influencers/1');
       expect(result).toEqual(mockInfluencer);
     });
   });
 
   describe('searchInfluencer', () => {
-    it('invokes Edge Function with handle and platform', async () => {
-      mockInvoke.mockResolvedValue({ data: mockInfluencer, error: null });
+    it('posts search request with handle and platform', async () => {
+      mockPost.mockResolvedValue({ data: mockInfluencer });
       const { searchInfluencer } = await import('../api');
 
       const result = await searchInfluencer('testuser', 'instagram');
 
-      expect(mockInvoke).toHaveBeenCalledWith('search-influencer', {
-        body: { handle: 'testuser', platform: 'instagram' },
+      expect(mockPost).toHaveBeenCalledWith('/api/influencers/search', {
+        handle: 'testuser',
+        platform: 'instagram',
       });
       expect(result).toEqual(mockInfluencer);
     });
   });
 
   describe('bulkSearchInfluencers', () => {
-    it('invokes Edge Function for bulk search', async () => {
+    it('posts bulk search request', async () => {
       const response = { saved: 2, errors: 0, results: [mockInfluencer] };
-      mockInvoke.mockResolvedValue({ data: response, error: null });
+      mockPost.mockResolvedValue({ data: response });
       const { bulkSearchInfluencers } = await import('../api');
 
       const result = await bulkSearchInfluencers(['user1', 'user2'], 'tiktok');
 
-      expect(mockInvoke).toHaveBeenCalledWith('bulk-search-influencers', {
-        body: { handles: ['user1', 'user2'], platform: 'tiktok' },
+      expect(mockPost).toHaveBeenCalledWith('/api/influencers/bulk-search', {
+        handles: ['user1', 'user2'],
+        platform: 'tiktok',
       });
       expect(result).toEqual(response);
     });
   });
 
   describe('updateInfluencer', () => {
-    it('updates influencer via Supabase', async () => {
+    it('patches influencer with updates', async () => {
       const updated = { ...mockInfluencer, status: 'contacted' as const };
-      mockUpdate.mockReturnValue({ eq: mockEq });
-      mockEq.mockReturnValue({ select: mockSelect });
-      mockSelect.mockReturnValue({ single: mockSingle });
-      mockSingle.mockResolvedValue({ data: updated, error: null });
-
+      mockPatch.mockResolvedValue({ data: updated });
       const { updateInfluencer } = await import('../api');
+
       const result = await updateInfluencer('1', { status: 'contacted' });
 
-      expect(mockUpdate).toHaveBeenCalledWith({ status: 'contacted' });
+      expect(mockPatch).toHaveBeenCalledWith('/api/influencers/1', { status: 'contacted' });
       expect(result).toEqual(updated);
     });
   });
 
   describe('deleteInfluencer', () => {
     it('deletes influencer by id', async () => {
-      mockDeleteFn.mockReturnValue({ eq: mockEq });
-      mockEq.mockResolvedValue({ error: null });
-
+      mockDelete.mockResolvedValue({});
       const { deleteInfluencer } = await import('../api');
+
       await deleteInfluencer('1');
 
-      expect(mockEq).toHaveBeenCalledWith('id', '1');
+      expect(mockDelete).toHaveBeenCalledWith('/api/influencers/1');
     });
   });
 
   describe('logOutreach', () => {
-    it('inserts outreach data for an influencer', async () => {
-      mockInsert.mockReturnValue({ select: mockSelect });
-      mockSelect.mockReturnValue({ single: mockSingle });
-      mockSingle.mockResolvedValue({ data: mockOutreach, error: null });
-
+    it('posts outreach data for an influencer', async () => {
+      mockPost.mockResolvedValue({ data: mockOutreach });
       const { logOutreach } = await import('../api');
+
       const outreachData = {
         contact_date: '2024-01-15',
         channel: 'email',
@@ -198,8 +187,23 @@ describe('lib/api', () => {
 
       const result = await logOutreach('1', outreachData);
 
-      expect(mockInsert).toHaveBeenCalledWith({ ...outreachData, influencer_id: '1' });
+      expect(mockPost).toHaveBeenCalledWith('/api/influencers/1/outreach', outreachData);
       expect(result).toEqual(mockOutreach);
+    });
+
+    it('posts outreach without optional fields', async () => {
+      mockPost.mockResolvedValue({ data: mockOutreach });
+      const { logOutreach } = await import('../api');
+
+      const outreachData = {
+        contact_date: '2024-01-15',
+        channel: 'dm',
+        message_sent: 'Hi there!',
+      };
+
+      await logOutreach('1', outreachData);
+
+      expect(mockPost).toHaveBeenCalledWith('/api/influencers/1/outreach', outreachData);
     });
   });
 });

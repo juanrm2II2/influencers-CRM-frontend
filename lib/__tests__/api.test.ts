@@ -13,36 +13,6 @@ const mockSingle = vi.fn();
 const mockOrder = vi.fn();
 const mockInvoke = vi.fn();
 
-// Chainable builder mock
-function chainable(terminal?: Record<string, unknown>) {
-  const chain: Record<string, ReturnType<typeof vi.fn>> = {
-    select: mockSelect,
-    insert: mockInsert,
-    update: mockUpdate,
-    delete: mockDeleteFn,
-    eq: mockEq,
-    gte: mockGte,
-    single: mockSingle,
-    order: mockOrder,
-  };
-  for (const fn of Object.values(chain)) {
-    fn.mockReturnValue(new Proxy({}, {
-      get(_t, prop: string) {
-        if (prop === 'then') return undefined; // prevent auto-await
-        return chain[prop] ?? vi.fn().mockReturnThis();
-      },
-    }));
-  }
-  if (terminal) {
-    mockSingle.mockResolvedValue(terminal);
-    mockOrder.mockResolvedValue(terminal);
-    mockDeleteFn.mockReturnValue({
-      eq: vi.fn().mockResolvedValue(terminal),
-    });
-  }
-  return chain;
-}
-
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     from: vi.fn().mockReturnValue({

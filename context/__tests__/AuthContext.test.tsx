@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthProvider, useAuth } from '../AuthContext';
 import type { ReactNode } from 'react';
@@ -32,7 +32,7 @@ function TestConsumer({ action }: { action?: string }) {
       <span data-testid="has-manager">{String(hasRole('manager'))}</span>
       <span data-testid="has-viewer">{String(hasRole('viewer'))}</span>
       {action === 'login' && (
-        <button onClick={() => login({ email: 'test@example.com', password: 'password123' })}>
+        <button onClick={() => { login({ email: 'test@example.com', password: 'password123' }).catch(() => {}); }}>
           Login
         </button>
       )}

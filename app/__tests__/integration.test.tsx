@@ -55,7 +55,11 @@ function AuthCRUDTestApp() {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
 
   async function handleLogin() {
-    await login({ email: 'test@example.com', password: 'password' });
+    try {
+      await login({ email: 'test@example.com', password: 'password' });
+    } catch {
+      // Expected in failure tests – swallow to prevent unhandled rejection
+    }
   }
 
   async function handleCrudOps() {

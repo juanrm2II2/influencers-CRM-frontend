@@ -14,6 +14,11 @@ import UserMenu from '@/components/UserMenu';
 
 const STATUSES: Status[] = ['prospect', 'contacted', 'negotiating', 'active', 'declined'];
 
+/** Returns true when the URL uses a safe http(s) protocol. */
+function isValidHttpUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
+
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -72,7 +77,7 @@ export default function InfluencerDetailPage() {
       const updated = await updateInfluencer(id, { status: newStatus });
       setInfluencer((prev) => (prev ? { ...prev, status: updated.status } : prev));
     } catch {
-      // silently fail status update
+      setError('Failed to update status. Please try again.');
     }
   }
 
@@ -85,7 +90,7 @@ export default function InfluencerDetailPage() {
       setNotes(sanitizedNotes);
       setInfluencer((prev) => (prev ? { ...prev, notes: sanitizedNotes } : prev));
     } catch {
-      // silently fail notes save
+      setError('Failed to save notes. Please try again.');
     } finally {
       setSavingNotes(false);
     }
@@ -98,6 +103,7 @@ export default function InfluencerDetailPage() {
       await deleteInfluencer(id);
       router.push('/dashboard');
     } catch {
+      setError('Failed to delete influencer. Please try again.');
       setDeleting(false);
     }
   }
@@ -169,7 +175,7 @@ export default function InfluencerDetailPage() {
                 <StatusBadge status={influencer.status} />
               </div>
               <p className="text-gray-500 mt-1">@{influencer.handle}</p>
-              {influencer.profile_url && (
+              {influencer.profile_url && isValidHttpUrl(influencer.profile_url) && (
                 <a
                   href={influencer.profile_url}
                   target="_blank"

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { CSP_HEADER_NAME, buildCspHeaderValue } from '@/lib/csp';
 
 // Routes that don't require authentication
 const PUBLIC_PATHS = ['/login'];
@@ -15,26 +16,6 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Strict-Transport-Security':
     'max-age=63072000; includeSubDomains; preload',
 };
-
-// ─── Content Security Policy (CSP) ─────────────────────────────────────────
-// Enforced mode – blocks resources that violate the policy.
-// Violations are reported to the configured report-uri endpoint.
-const CSP_HEADER_NAME = 'Content-Security-Policy';
-
-function buildCspHeaderValue(): string {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-  const reportUri = process.env.CSP_REPORT_URI || '/api/csp-report';
-  const directives = [
-    "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self'",
-    "img-src 'self' https: data:",
-    `connect-src 'self' ${apiUrl}`,
-    "frame-ancestors 'none'",
-    `report-uri ${reportUri}`,
-  ];
-  return directives.join('; ');
-}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

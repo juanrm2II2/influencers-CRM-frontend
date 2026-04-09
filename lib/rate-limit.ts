@@ -34,23 +34,34 @@ export class RateLimiter {
     const now = Date.now();
     const windowStart = now - this.windowMs;
 
-    let timestamps = this.hits.get(key);
-    if (timestamps) {
-      // Remove entries that have fallen outside the window.
-      timestamps = timestamps.filter((t) => t > windowStart);
-    } else {
-      timestamps = [];
-    }
+    const raw = this.hits.get(key);
+    // Remove entries that have fallen outside the window.
+    const timestamps = raw ? raw.filter((t) => t > windowStart) : [];
 
     if (timestamps.length >= this.limit) {
       // Still over limit after pruning — reject.
-      // Only update stored timestamps when pruning removed entries.
+      // Save pruned array back to avoid stale-entry build-up.
+      this.hits.set(key, timestamps);
       return false;
     }
 
     timestamps.push(now);
     this.hits.set(key, timestamps);
     return true;
+  }
+
+  /**
+   * Evict keys whose most recent request is older than the window.
+   * Call periodically (e.g. via setInterval) in long-lived processes to
+   * prevent unbounded Map growth.
+   */
+  evictStale(): void {
+    const cutoff = Date.now() - this.windowMs;
+    for (const [key, timestamps] of this.hits) {
+      if (timestamps.length === 0 || timestamps[timestamps.length - 1] < cutoff) {
+        this.hits.delete(key);
+      }
+    }
   }
 
   /** Remove all tracked data (useful in tests). */

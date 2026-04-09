@@ -39,7 +39,7 @@ export default function AddInfluencerModal({ onClose, onSuccess }: Props) {
     setLoading(true);
     setError('');
     try {
-      const influencer = await searchInfluencer(handle.trim(), platform);
+      const influencer = await searchInfluencer(handle.trim(), platform, niche || undefined);
       onSuccess(influencer);
     } catch (err: unknown) {
       const message =

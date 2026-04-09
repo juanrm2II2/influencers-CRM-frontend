@@ -58,7 +58,7 @@ export class RateLimiter {
   evictStale(): void {
     const cutoff = Date.now() - this.windowMs;
     for (const [key, timestamps] of this.hits) {
-      if (timestamps.length === 0 || timestamps[timestamps.length - 1] <= cutoff) {
+      if (timestamps.length === 0 || timestamps[timestamps.length - 1] < cutoff) {
         this.hits.delete(key);
       }
     }

@@ -14,6 +14,11 @@ import UserMenu from '@/components/UserMenu';
 
 const STATUSES: Status[] = ['prospect', 'contacted', 'negotiating', 'active', 'declined'];
 
+/** Returns true when the URL uses a safe http(s) protocol. */
+function isValidHttpUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
+
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -170,7 +175,7 @@ export default function InfluencerDetailPage() {
                 <StatusBadge status={influencer.status} />
               </div>
               <p className="text-gray-500 mt-1">@{influencer.handle}</p>
-              {influencer.profile_url && /^https?:\/\//i.test(influencer.profile_url) && (
+              {influencer.profile_url && isValidHttpUrl(influencer.profile_url) && (
                 <a
                   href={influencer.profile_url}
                   target="_blank"

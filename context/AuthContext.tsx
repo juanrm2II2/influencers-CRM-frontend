@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import type { User, LoginCredentials, Role } from '@/types';
+import { csrfHeaders } from '@/lib/csrf';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 // Tokens are now stored as httpOnly cookies set by the backend.
@@ -90,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const res = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
         credentials: 'include',
         body: JSON.stringify(credentials),
       });
@@ -119,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await fetch(`${apiUrl}/api/auth/logout`, {
         method: 'POST',
+        headers: { ...csrfHeaders('POST') },
         credentials: 'include',
       });
     } catch {

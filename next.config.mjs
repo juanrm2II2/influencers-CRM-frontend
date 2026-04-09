@@ -31,22 +31,9 @@ const nextConfig = {
   },
 
   // ─── Security headers (F-004) ──────────────────────────────────────────
+  // CSP is applied by middleware.ts (via lib/csp.ts) on all HTML routes.
+  // Only non-CSP security headers are configured here for static responses.
   async headers() {
-    // Build CSP value — enforced mode.
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-    const reportUri = process.env.CSP_REPORT_URI || '/api/csp-report';
-    const cspValue = [
-      "default-src 'self'",
-      "script-src 'self'",
-      "style-src 'self'",
-      "img-src 'self' https: data:",
-      `connect-src 'self' ${apiUrl}`,
-      "frame-ancestors 'none'",
-      `report-uri ${reportUri}`,
-    ].join('; ');
-
-    const cspHeaderName = 'Content-Security-Policy';
-
     return [
       {
         source: '/(.*)',
@@ -66,7 +53,6 @@ const nextConfig = {
             value: 'max-age=63072000; includeSubDomains; preload',
           },
           { key: 'X-DNS-Prefetch-Control', value: 'on' },
-          { key: cspHeaderName, value: cspValue },
         ],
       },
     ];

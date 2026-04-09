@@ -72,7 +72,7 @@ export default function InfluencerDetailPage() {
       const updated = await updateInfluencer(id, { status: newStatus });
       setInfluencer((prev) => (prev ? { ...prev, status: updated.status } : prev));
     } catch {
-      // silently fail status update
+      setError('Failed to update status. Please try again.');
     }
   }
 
@@ -85,7 +85,7 @@ export default function InfluencerDetailPage() {
       setNotes(sanitizedNotes);
       setInfluencer((prev) => (prev ? { ...prev, notes: sanitizedNotes } : prev));
     } catch {
-      // silently fail notes save
+      setError('Failed to save notes. Please try again.');
     } finally {
       setSavingNotes(false);
     }
@@ -98,6 +98,7 @@ export default function InfluencerDetailPage() {
       await deleteInfluencer(id);
       router.push('/dashboard');
     } catch {
+      setError('Failed to delete influencer. Please try again.');
       setDeleting(false);
     }
   }
@@ -169,7 +170,7 @@ export default function InfluencerDetailPage() {
                 <StatusBadge status={influencer.status} />
               </div>
               <p className="text-gray-500 mt-1">@{influencer.handle}</p>
-              {influencer.profile_url && (
+              {influencer.profile_url && /^https?:\/\//i.test(influencer.profile_url) && (
                 <a
                   href={influencer.profile_url}
                   target="_blank"

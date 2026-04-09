@@ -45,8 +45,8 @@ export async function getInfluencer(id: string): Promise<Influencer> {
   return data;
 }
 
-export async function searchInfluencer(handle: string, platform: string): Promise<Influencer> {
-  const { data } = await api.post<Influencer>('/api/influencers/search', { handle, platform });
+export async function searchInfluencer(handle: string, platform: string, niche?: string): Promise<Influencer> {
+  const { data } = await api.post<Influencer>('/api/influencers/search', { handle, platform, ...(niche ? { niche } : {}) });
   return data;
 }
 

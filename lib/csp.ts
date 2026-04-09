@@ -18,6 +18,9 @@ export function buildCspHeaderValue(): string {
     "img-src 'self' https: data:",
     `connect-src 'self' ${apiUrl}`,
     "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
     `report-uri ${reportUri}`,
   ];
 

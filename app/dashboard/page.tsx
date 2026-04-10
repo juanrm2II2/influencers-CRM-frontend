@@ -83,6 +83,12 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             <a
+              href="/token-sale"
+              className="text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors"
+            >
+              Token Sale
+            </a>
+            <a
               href="/data-export"
               className="text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors"
             >

@@ -6,6 +6,34 @@ import { useState, useCallback, useMemo } from 'react';
 import { TOKEN_SALE_ABI, VESTING_ABI, CONTRACT_ADDRESSES } from './contracts';
 import type { TokenSaleInfo, VestingSchedule, TransactionState } from '@/types/web3';
 
+// ─── Shared helper: derive final tx state from write-state + receipt ─────────
+
+type WriteState = {
+  status: 'idle' | 'pending' | 'confirming' | 'failed';
+  hash?: `0x${string}`;
+  error?: string;
+};
+
+function deriveTransactionState(
+  writeState: WriteState,
+  receipt: { transactionHash: `0x${string}`; blockNumber: bigint; gasUsed: bigint; status: 'success' | 'reverted' } | undefined,
+): TransactionState {
+  if (writeState.status === 'confirming' && receipt) {
+    return {
+      status: receipt.status === 'success' ? 'confirmed' : 'failed',
+      hash: writeState.hash,
+      receipt: {
+        transactionHash: receipt.transactionHash,
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed,
+        status: receipt.status,
+      },
+      error: receipt.status === 'reverted' ? 'Transaction reverted' : undefined,
+    };
+  }
+  return writeState;
+}
+
 // ─── Token Sale Info ─────────────────────────────────────────────────────────
 
 export function useTokenSaleInfo() {
@@ -93,35 +121,20 @@ export function useWhitelistStatus(address: `0x${string}` | undefined) {
 // ─── Contribute ──────────────────────────────────────────────────────────────
 
 export function useContribute() {
-  const [txState, setTxState] = useState<TransactionState>({ status: 'idle' });
+  const [writeState, setWriteState] = useState<WriteState>({ status: 'idle' });
   const { writeContractAsync } = useWriteContract();
 
   const { data: receipt } = useWaitForTransactionReceipt({
-    hash: txState.hash,
-    query: { enabled: !!txState.hash },
+    hash: writeState.hash,
+    query: { enabled: !!writeState.hash },
   });
 
-  // Update state when receipt arrives
-  useMemo(() => {
-    if (receipt && txState.status === 'confirming') {
-      setTxState({
-        status: receipt.status === 'success' ? 'confirmed' : 'failed',
-        hash: txState.hash,
-        receipt: {
-          transactionHash: receipt.transactionHash,
-          blockNumber: receipt.blockNumber,
-          gasUsed: receipt.gasUsed,
-          status: receipt.status,
-        },
-        error: receipt.status === 'reverted' ? 'Transaction reverted' : undefined,
-      });
-    }
-  }, [receipt, txState.status, txState.hash]);
+  const txState = deriveTransactionState(writeState, receipt);
 
   const contribute = useCallback(
     async (amountEth: string) => {
       try {
-        setTxState({ status: 'pending' });
+        setWriteState({ status: 'pending' });
         const value = parseEther(amountEth);
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.tokenSale,
@@ -129,16 +142,16 @@ export function useContribute() {
           functionName: 'contribute',
           value,
         });
-        setTxState({ status: 'confirming', hash });
+        setWriteState({ status: 'confirming', hash });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Transaction failed';
-        setTxState({ status: 'failed', error: message });
+        setWriteState({ status: 'failed', error: message });
       }
     },
     [writeContractAsync],
   );
 
-  const reset = useCallback(() => setTxState({ status: 'idle' }), []);
+  const reset = useCallback(() => setWriteState({ status: 'idle' }), []);
 
   return { txState, contribute, reset };
 }
@@ -188,46 +201,32 @@ export function useReleasableAmount(address: `0x${string}` | undefined) {
 // ─── Claim vested tokens ─────────────────────────────────────────────────────
 
 export function useClaimVestedTokens() {
-  const [txState, setTxState] = useState<TransactionState>({ status: 'idle' });
+  const [writeState, setWriteState] = useState<WriteState>({ status: 'idle' });
   const { writeContractAsync } = useWriteContract();
 
   const { data: receipt } = useWaitForTransactionReceipt({
-    hash: txState.hash,
-    query: { enabled: !!txState.hash },
+    hash: writeState.hash,
+    query: { enabled: !!writeState.hash },
   });
 
-  useMemo(() => {
-    if (receipt && txState.status === 'confirming') {
-      setTxState({
-        status: receipt.status === 'success' ? 'confirmed' : 'failed',
-        hash: txState.hash,
-        receipt: {
-          transactionHash: receipt.transactionHash,
-          blockNumber: receipt.blockNumber,
-          gasUsed: receipt.gasUsed,
-          status: receipt.status,
-        },
-        error: receipt.status === 'reverted' ? 'Transaction reverted' : undefined,
-      });
-    }
-  }, [receipt, txState.status, txState.hash]);
+  const txState = deriveTransactionState(writeState, receipt);
 
   const claim = useCallback(async () => {
     try {
-      setTxState({ status: 'pending' });
+      setWriteState({ status: 'pending' });
       const hash = await writeContractAsync({
         address: CONTRACT_ADDRESSES.vesting,
         abi: VESTING_ABI,
         functionName: 'release',
       });
-      setTxState({ status: 'confirming', hash });
+      setWriteState({ status: 'confirming', hash });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Transaction failed';
-      setTxState({ status: 'failed', error: message });
+      setWriteState({ status: 'failed', error: message });
     }
   }, [writeContractAsync]);
 
-  const reset = useCallback(() => setTxState({ status: 'idle' }), []);
+  const reset = useCallback(() => setWriteState({ status: 'idle' }), []);
 
   return { txState, claim, reset };
 }
@@ -235,44 +234,30 @@ export function useClaimVestedTokens() {
 // ─── Whitelist management (admin) ────────────────────────────────────────────
 
 export function useWhitelistManagement() {
-  const [txState, setTxState] = useState<TransactionState>({ status: 'idle' });
+  const [writeState, setWriteState] = useState<WriteState>({ status: 'idle' });
   const { writeContractAsync } = useWriteContract();
 
   const { data: receipt } = useWaitForTransactionReceipt({
-    hash: txState.hash,
-    query: { enabled: !!txState.hash },
+    hash: writeState.hash,
+    query: { enabled: !!writeState.hash },
   });
 
-  useMemo(() => {
-    if (receipt && txState.status === 'confirming') {
-      setTxState({
-        status: receipt.status === 'success' ? 'confirmed' : 'failed',
-        hash: txState.hash,
-        receipt: {
-          transactionHash: receipt.transactionHash,
-          blockNumber: receipt.blockNumber,
-          gasUsed: receipt.gasUsed,
-          status: receipt.status,
-        },
-        error: receipt.status === 'reverted' ? 'Transaction reverted' : undefined,
-      });
-    }
-  }, [receipt, txState.status, txState.hash]);
+  const txState = deriveTransactionState(writeState, receipt);
 
   const addToWhitelist = useCallback(
     async (accounts: `0x${string}`[], maxContributions: bigint[]) => {
       try {
-        setTxState({ status: 'pending' });
+        setWriteState({ status: 'pending' });
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.tokenSale,
           abi: TOKEN_SALE_ABI,
           functionName: 'addToWhitelist',
           args: [accounts, maxContributions],
         });
-        setTxState({ status: 'confirming', hash });
+        setWriteState({ status: 'confirming', hash });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Transaction failed';
-        setTxState({ status: 'failed', error: message });
+        setWriteState({ status: 'failed', error: message });
       }
     },
     [writeContractAsync],
@@ -281,23 +266,23 @@ export function useWhitelistManagement() {
   const removeFromWhitelist = useCallback(
     async (accounts: `0x${string}`[]) => {
       try {
-        setTxState({ status: 'pending' });
+        setWriteState({ status: 'pending' });
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.tokenSale,
           abi: TOKEN_SALE_ABI,
           functionName: 'removeFromWhitelist',
           args: [accounts],
         });
-        setTxState({ status: 'confirming', hash });
+        setWriteState({ status: 'confirming', hash });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Transaction failed';
-        setTxState({ status: 'failed', error: message });
+        setWriteState({ status: 'failed', error: message });
       }
     },
     [writeContractAsync],
   );
 
-  const reset = useCallback(() => setTxState({ status: 'idle' }), []);
+  const reset = useCallback(() => setWriteState({ status: 'idle' }), []);
 
   return { txState, addToWhitelist, removeFromWhitelist, reset };
 }

@@ -200,7 +200,8 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    expect(screen.getByText('Influencer CRM')).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 1, name: 'Influencer CRM' });
+    expect(heading).toBeInTheDocument();
     expect(screen.getByText('Manage your influencer partnerships')).toBeInTheDocument();
   });
 });

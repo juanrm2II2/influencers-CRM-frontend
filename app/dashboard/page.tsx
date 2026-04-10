@@ -8,6 +8,7 @@ import StatsBar from '@/components/StatsBar';
 import FilterBar from '@/components/FilterBar';
 import AddInfluencerModal from '@/components/AddInfluencerModal';
 import UserMenu from '@/components/UserMenu';
+import Footer from '@/components/Footer';
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -73,7 +74,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
@@ -81,6 +82,12 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-500">Manage your influencer partnerships</p>
           </div>
           <div className="flex items-center gap-3">
+            <a
+              href="/data-export"
+              className="text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors"
+            >
+              Export Data
+            </a>
             <button
               onClick={() => setShowAddModal(true)}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
@@ -152,6 +159,8 @@ export default function DashboardPage() {
           }}
         />
       )}
+
+      <Footer />
     </div>
   );
 }

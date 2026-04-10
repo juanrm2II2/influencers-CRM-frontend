@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { CSP_HEADER_NAME, buildCspHeaderValue } from '@/lib/csp';
 
 // Routes that don't require authentication
-const PUBLIC_PATHS = ['/login'];
+const PUBLIC_PATHS = ['/login', '/privacy', '/terms', '/cookie-policy', '/dpa', '/data-practices'];
 
 // ─── Security headers (F-004) ──────────────────────────────────────────────
 

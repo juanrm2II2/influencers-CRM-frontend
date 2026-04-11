@@ -29,7 +29,8 @@ vi.mock("next/navigation", () => ({
 
 // Fetch mock
 const mockFetch = vi.fn();
-global.fetch = mockFetch as any;
+// global.fetch = mockFetch as any;
+global.fetch = mockFetch as unknown as typeof global.fetch;
 
 // -----------------------------
 // Test Consumer
@@ -92,7 +93,7 @@ describe("AuthContext", () => {
 
   afterAll(() => {
     // restore global fetch
-    // @ts-ignore
+    // @ts-error
     global.fetch = undefined;
   });
 

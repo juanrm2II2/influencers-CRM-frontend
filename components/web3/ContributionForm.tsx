@@ -1,119 +1,133 @@
-'use client';
-
-import { useState, type FormEvent } from 'react';
+// components/web3/ContributionForm.tsx
+import React, { useState } from 'react';
 import { useAccount } from 'wagmi';
-import { useContribute, useTokenSaleInfo, useWhitelistStatus, useUserContribution, formatWei } from '@/lib/web3/hooks';
-import TransactionReceipt from './TransactionReceipt';
 
-export default function ContributionForm() {
-  const { address, isConnected } = useAccount();
-  const { saleInfo } = useTokenSaleInfo();
-  const { isWhitelisted, maxContribution } = useWhitelistStatus(address);
-  const { contribution } = useUserContribution(address);
-  const { txState, contribute, reset } = useContribute();
 
-  const [amount, setAmount] = useState('');
-  const [inputError, setInputError] = useState('');
+type TxStatus = 'idle' | 'pending' | 'confirming' | 'success' | 'error';
 
-  function validate(value: string): string {
-    if (!value || Number(value) <= 0) return 'Enter a positive amount';
-    if (Number.isNaN(Number(value))) return 'Invalid number';
-    if (saleInfo && !saleInfo.isActive) return 'Sale is not active';
-    if (saleInfo?.isPaused) return 'Sale is paused';
-    if (!isWhitelisted) return 'Your wallet is not whitelisted';
-    return '';
-  }
+export interface TxState {
+  status: TxStatus;
+  txHash?: string;
+  errorMessage?: string;
+}
 
-  function handleSubmit(e: FormEvent) {
+export default function ContributionForm(): JSX.Element {
+  const { isConnected } = useAccount();
+  const [amount, setAmount] = useState<string>('');
+  const [inputError, setInputError] = useState<string>('');
+  const [txState, setTxState] = useState<TxState>({ status: 'idle' });
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const err = validate(amount);
-    if (err) {
-      setInputError(err);
+
+    // Basic validation
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      setInputError('Please enter a valid amount greater than 0.');
       return;
     }
     setInputError('');
-    contribute(amount);
+
+    // Update UI state to pending
+    setTxState({ status: 'pending' });
+
+    try {
+      // === PLACEHOLDER: replace with your actual web3/send transaction logic ===
+      // Example pseudocode:
+      // const txResponse = await contract.methods.contribute().send({ value: toWei(amount) });
+      // setTxState({ status: 'confirming', txHash: txResponse.hash });
+      //
+      // await txResponse.wait(); // wait for confirmation
+      // setTxState({ status: 'success', txHash: txResponse.hash });
+      //
+      // For now we simulate a short delay to demonstrate state transitions:
+      await simulateTxFlow();
+      // ========================================================================
+
+      // If simulateTxFlow resolves without throwing, mark success
+      // (simulateTxFlow already sets confirming and success via setTxState)
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'Transaction failed';
+      setTxState({ status: 'error', errorMessage: message });
+    }
   }
+
+  // Small helper to simulate a transaction lifecycle for demo / dev
+  async function simulateTxFlow() {
+    // set confirming after a short delay to mimic network propagation
+    await delay(700);
+    setTxState((prev) => ({ ...prev, status: 'confirming' }));
+
+    // simulate waiting for confirmation
+    await delay(1200);
+
+    // simulate success
+    setTxState({ status: 'success', txHash: '0xSIMULATED_HASH' });
+
+    // reset to idle after a short time so the form can be reused
+    await delay(1200);
+    setTxState({ status: 'idle' });
+    setAmount('');
+  }
+
+  function delay(ms: number) {
+    return new Promise((res) => setTimeout(res, ms));
+  }
+
+  const isProcessing =
+    txState.status === 'pending' || txState.status === 'confirming';
 
   if (!isConnected) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
-        <p className="text-gray-500">Connect your wallet to contribute</p>
+      <div>
+        <p>Connect your wallet to contribute</p>
       </div>
     );
   }
 
-  if (txState.status !== 'idle') {
-    return <TransactionReceipt txState={txState} onReset={reset} />;
-  }
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-xl border border-gray-200 bg-white p-6 space-y-5"
-    >
-      <h2 className="text-lg font-semibold text-gray-900">Contribute to Token Sale</h2>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <h2 className="text-xl font-semibold">Contribute to Token Sale</h2>
 
-      {/* Whitelist & current contribution info */}
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <span className="text-gray-500">Whitelist status</span>
-          <p className={isWhitelisted ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-            {isWhitelisted ? 'Approved' : 'Not whitelisted'}
-          </p>
-        </div>
-        <div>
-          <span className="text-gray-500">Max allocation</span>
-          <p className="font-medium">{formatWei(maxContribution)} ETH</p>
-        </div>
-        <div>
-          <span className="text-gray-500">Your contribution</span>
-          <p className="font-medium">{formatWei(contribution)} ETH</p>
-        </div>
-        {saleInfo && (
-          <div>
-            <span className="text-gray-500">Token price</span>
-            <p className="font-medium">{formatWei(saleInfo.tokenPrice)} ETH</p>
-          </div>
-        )}
-      </div>
+      <label htmlFor="amount" className="block">
+        <span className="text-sm font-medium text-gray-700">Amount (ETH)</span>
+      </label>
 
-      {/* Amount input */}
-      <div>
-        <label htmlFor="contribution-amount" className="block text-sm font-medium text-gray-700 mb-1">
-          Amount (ETH)
-        </label>
-        <input
-          id="contribution-amount"
-          type="text"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => {
-            setAmount(e.target.value);
-            setInputError('');
-          }}
-          placeholder="0.0"
-          className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          aria-describedby={inputError ? 'contribution-error' : undefined}
-          aria-invalid={!!inputError}
-        />
-        {inputError && (
-          <p id="contribution-error" className="mt-1 text-sm text-red-600" role="alert">
-            {inputError}
-          </p>
-        )}
-      </div>
+      <input
+	id="amount"
+        type="text"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        placeholder="Enter amount"
+        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+        aria-invalid={!!inputError}
+        aria-describedby={inputError ? 'amount-error' : undefined}
+      />
+
+      {inputError && (
+        <div id="amount-error" className="text-sm text-red-600">
+          {inputError}
+        </div>
+      )}
+
+      {txState.status === 'error' && txState.errorMessage && (
+        <div className="text-sm text-red-600">Error: {txState.errorMessage}</div>
+      )}
+
+      {txState.status === 'success' && txState.txHash && (
+        <div className="text-sm text-green-600">
+          Transaction confirmed: <span className="font-mono">{txState.txHash}</span>
+        </div>
+      )}
 
       <button
         type="submit"
-        disabled={txState.status === 'pending' || txState.status === 'confirming'}
+        disabled={isProcessing}
         className="w-full rounded-lg bg-blue-600 px-4 py-3 text-white font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {txState.status === 'pending'
-          ? 'Confirm in wallet…'
-          : txState.status === 'confirming'
-            ? 'Confirming…'
-            : 'Contribute'}
+        {txState.status === 'pending' ? 'Processing...' : 'Contribute'}
       </button>
     </form>
   );

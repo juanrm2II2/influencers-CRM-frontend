@@ -23,12 +23,22 @@ export function buildCspHeaderValue(): string {
     'wss://*.alchemy.com',
   ].join(' ');
 
+  // KYC provider (SumSub) – the WebSDK communicates with SumSub's API
+  // and loads its verification UI inside an iframe.
+  const kycConnectSrc = [
+    'https://*.sumsub.com',
+    'wss://*.sumsub.com',
+  ].join(' ');
+
+  const kycFrameSrc = 'https://*.sumsub.com';
+
   const directives = [
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self'",
     "img-src 'self' https: data:",
-    `connect-src 'self' ${apiUrl} ${web3ConnectSrc}`,
+    `connect-src 'self' ${apiUrl} ${web3ConnectSrc} ${kycConnectSrc}`,
+    `frame-src 'self' ${kycFrameSrc}`,
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import ConnectWallet from '@/components/web3/ConnectWallet';
 import SaleProgressDashboard from '@/components/web3/SaleProgressDashboard';
 import ContributionForm from '@/components/web3/ContributionForm';
+import KycVerificationBanner from '@/components/web3/KycVerificationBanner';
 import UserMenu from '@/components/UserMenu';
 import Footer from '@/components/Footer';
 
@@ -42,6 +43,7 @@ export default function TokenSalePage() {
 
         <main className="max-w-4xl mx-auto px-6 py-8 space-y-6 flex-1">
           <SaleProgressDashboard />
+          <KycVerificationBanner />
           <ContributionForm />
         </main>
 

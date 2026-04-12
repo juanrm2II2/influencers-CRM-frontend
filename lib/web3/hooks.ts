@@ -4,7 +4,8 @@ import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 
 import { parseEther, formatEther } from 'viem';
 import { useState, useCallback, useMemo } from 'react';
 import { TOKEN_SALE_ABI, VESTING_ABI, CONTRACT_ADDRESSES } from './contracts';
-import type { TokenSaleInfo, VestingSchedule, TransactionState } from '@/types/web3';
+import type { TokenSaleInfo, VestingSchedule, TransactionState, KycVerification, KycStatus } from '@/types/web3';
+import { getKycStatus, createKycAccessToken } from '@/lib/kyc';
 
 // ─── Shared helper: derive final tx state from write-state + receipt ─────────
 
@@ -285,6 +286,43 @@ export function useWhitelistManagement() {
   const reset = useCallback(() => setWriteState({ status: 'idle' }), []);
 
   return { txState, addToWhitelist, removeFromWhitelist, reset };
+}
+
+// ─── KYC verification ────────────────────────────────────────────────────────
+
+export function useKycVerification(address: `0x${string}` | undefined) {
+  const [verification, setVerification] = useState<KycVerification>({ status: 'none' as KycStatus });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStatus = useCallback(async () => {
+    if (!address) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await getKycStatus(address);
+      setVerification(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch KYC status';
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [address]);
+
+  const requestToken = useCallback(async () => {
+    if (!address) throw new Error('Wallet not connected');
+    return createKycAccessToken(address);
+  }, [address]);
+
+  return {
+    verification,
+    isVerified: verification.status === 'approved',
+    isLoading,
+    error,
+    fetchStatus,
+    requestToken,
+  };
 }
 
 // ─── Formatting helpers ──────────────────────────────────────────────────────

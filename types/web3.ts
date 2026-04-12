@@ -62,6 +62,28 @@ export interface WhitelistEntry {
   isWhitelisted: boolean;
 }
 
+// ─── KYC Verification ────────────────────────────────────────────────────────
+
+export type KycStatus = 'none' | 'pending' | 'approved' | 'rejected' | 'expired';
+
+export interface KycVerification {
+  /** Current KYC verification status */
+  status: KycStatus;
+  /** When the verification was last updated (ISO 8601) */
+  updatedAt?: string;
+  /** Human-readable reason when rejected */
+  rejectionReason?: string;
+  /** When the verification expires (ISO 8601) */
+  expiresAt?: string;
+}
+
+export interface KycAccessToken {
+  /** Short-lived token for the SumSub WebSDK */
+  token: string;
+  /** Applicant ID from the KYC provider */
+  applicantId: string;
+}
+
 export type TransactionStatus = 'idle' | 'pending' | 'confirming' | 'confirmed' | 'failed';
 
 export interface TransactionState {

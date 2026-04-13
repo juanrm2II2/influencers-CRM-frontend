@@ -1,15 +1,24 @@
 // components/web3/ContributionForm.tsx
 import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { useContribute, useKycVerification } from '@/lib/web3/hooks';
+import { useKycVerification } from '@/lib/web3/hooks';
+
+
+type TxStatus = 'idle' | 'pending' | 'confirming' | 'success' | 'error';
+
+export interface TxState {
+  status: TxStatus;
+  txHash?: string;
+  errorMessage?: string;
+}
 
 export default function ContributionForm(): JSX.Element {
   const { address, isConnected } = useAccount();
   const { isVerified, verification, isLoading: kycLoading, fetchStatus } =
     useKycVerification(address);
-  const { txState, contribute, reset } = useContribute();
   const [amount, setAmount] = useState<string>('');
   const [inputError, setInputError] = useState<string>('');
+  const [txState, setTxState] = useState<TxState>({ status: 'idle' });
 
   useEffect(() => {
     if (isConnected && address) {
@@ -33,7 +42,51 @@ export default function ContributionForm(): JSX.Element {
     }
     setInputError('');
 
-    await contribute(amount);
+    // Update UI state to pending
+    setTxState({ status: 'pending' });
+
+    try {
+      // === PLACEHOLDER: replace with your actual web3/send transaction logic ===
+      // Example pseudocode:
+      // const txResponse = await contract.methods.contribute().send({ value: toWei(amount) });
+      // setTxState({ status: 'confirming', txHash: txResponse.hash });
+      //
+      // await txResponse.wait(); // wait for confirmation
+      // setTxState({ status: 'success', txHash: txResponse.hash });
+      //
+      // For now we simulate a short delay to demonstrate state transitions:
+      await simulateTxFlow();
+      // ========================================================================
+
+      // If simulateTxFlow resolves without throwing, mark success
+      // (simulateTxFlow already sets confirming and success via setTxState)
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Transaction failed';
+      setTxState({ status: 'error', errorMessage: message });
+    }
+  }
+
+  // Small helper to simulate a transaction lifecycle for demo / dev
+  async function simulateTxFlow() {
+    // set confirming after a short delay to mimic network propagation
+    await delay(700);
+    setTxState((prev) => ({ ...prev, status: 'confirming' }));
+
+    // simulate waiting for confirmation
+    await delay(1200);
+
+    // simulate success
+    setTxState({ status: 'success', txHash: '0xSIMULATED_HASH' });
+
+    // reset to idle after a short time so the form can be reused
+    await delay(1200);
+    setTxState({ status: 'idle' });
+    setAmount('');
+  }
+
+  function delay(ms: number) {
+    return new Promise((res) => setTimeout(res, ms));
   }
 
   const isProcessing =
@@ -72,7 +125,7 @@ export default function ContributionForm(): JSX.Element {
       </label>
 
       <input
-        id="amount"
+	id="amount"
         type="text"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
@@ -89,24 +142,14 @@ export default function ContributionForm(): JSX.Element {
         </div>
       )}
 
-      {txState.status === 'failed' && txState.error && (
-        <div className="text-sm text-red-600">Error: {txState.error}</div>
+      {txState.status === 'error' && txState.errorMessage && (
+        <div className="text-sm text-red-600">Error: {txState.errorMessage}</div>
       )}
 
-      {txState.status === 'confirmed' && txState.hash && (
+      {txState.status === 'success' && txState.txHash && (
         <div className="text-sm text-green-600">
-          Transaction confirmed: <span className="font-mono">{txState.hash}</span>
+          Transaction confirmed: <span className="font-mono">{txState.txHash}</span>
         </div>
-      )}
-
-      {txState.status === 'confirmed' && (
-        <button
-          type="button"
-          onClick={() => { reset(); setAmount(''); }}
-          className="text-sm text-blue-600 hover:text-blue-800 underline"
-        >
-          Make another contribution
-        </button>
       )}
 
       <button

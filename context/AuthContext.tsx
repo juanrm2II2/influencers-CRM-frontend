@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'next/navigation';
 import type { User, LoginCredentials, Role } from '@/types';
 import { csrfHeaders } from '@/lib/csrf';
+import { API_URL } from '@/lib/config';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 // Tokens are now stored as httpOnly cookies set by the backend.
@@ -86,10 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (credentials: LoginCredentials) => {
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-
-      const res = await fetch(`${apiUrl}/api/auth/login`, {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
         credentials: 'include',
@@ -114,11 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-
     try {
-      await fetch(`${apiUrl}/api/auth/logout`, {
+      await fetch(`${API_URL}/api/auth/logout`, {
         method: 'POST',
         headers: { ...csrfHeaders('POST') },
         credentials: 'include',

@@ -1,11 +1,12 @@
 import axios from 'axios';
 import { Influencer, Outreach, DashboardFilters } from '@/types';
 import { getCsrfToken, CSRF_HEADER_NAME, CSRF_METHODS } from '@/lib/csrf';
+import { API_URL } from '@/lib/config';
 
 const USER_KEY = 'crm_user';
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001',
+  baseURL: API_URL,
   withCredentials: true, // Send httpOnly cookies with every request
 });
 

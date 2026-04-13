@@ -8,8 +8,7 @@
 
 import { csrfHeaders } from '@/lib/csrf';
 import type { KycVerification, KycAccessToken } from '@/types/web3';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+import { API_URL } from '@/lib/config';
 
 /**
  * Fetch the current KYC verification status for the authenticated user

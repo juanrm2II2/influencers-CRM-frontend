@@ -5,10 +5,12 @@
  * directives are defined in a single place, preventing accidental drift.
  */
 
+import { API_URL } from '@/lib/config';
+
 export const CSP_HEADER_NAME = 'Content-Security-Policy';
 
 export function buildCspHeaderValue(): string {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+  const apiUrl = API_URL;
   const reportUri = process.env.CSP_REPORT_URI || '/api/csp-report';
 
   // Web3 wallet connectors (WalletConnect, RainbowKit) need WebSocket &

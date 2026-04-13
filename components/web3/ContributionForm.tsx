@@ -62,9 +62,7 @@ export default function ContributionForm(): JSX.Element {
       // (simulateTxFlow already sets confirming and success via setTxState)
     } catch (err: unknown) {
       const message =
-        err && typeof err === 'object' && 'message' in err
-          ? String((err as { message: unknown }).message)
-          : 'Transaction failed';
+        err instanceof Error ? err.message : 'Transaction failed';
       setTxState({ status: 'error', errorMessage: message });
     }
   }

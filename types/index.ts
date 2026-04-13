@@ -13,20 +13,9 @@ export interface User {
   role: Role;
 }
 
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-}
-
 export interface LoginCredentials {
   email: string;
   password: string;
-}
-
-export interface AuthState {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
 }
 
 export interface Influencer {
@@ -56,8 +45,8 @@ export interface Outreach {
   contact_date: string;
   channel: Channel;
   message_sent: string;
-  response: string;
-  follow_up_date: string;
+  response?: string;
+  follow_up_date?: string;
   created_at: string;
 }
 

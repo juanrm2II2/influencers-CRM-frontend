@@ -1,5 +1,32 @@
-import { describe, it, expect } from 'vitest';
-import { formatWei, formatTokenAmount } from '../hooks';
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('@rainbow-me/rainbowkit', () => ({
+  getDefaultConfig: () => ({}),
+}));
+
+import { formatWei, formatTokenAmount, ChainMismatchError } from '../hooks';
+
+describe('ChainMismatchError', () => {
+  it('reports expected and actual chain IDs', () => {
+    const err = new ChainMismatchError(1, 11155111);
+    expect(err.name).toBe('ChainMismatchError');
+    expect(err.expected).toBe(1);
+    expect(err.actual).toBe(11155111);
+    expect(err.message).toContain('expected chain 1');
+    expect(err.message).toContain('chain 11155111');
+  });
+
+  it('handles undefined actual chain', () => {
+    const err = new ChainMismatchError(1, undefined);
+    expect(err.message).toContain('not connected');
+    expect(err.actual).toBeUndefined();
+  });
+
+  it('is an instance of Error', () => {
+    const err = new ChainMismatchError(1, 5);
+    expect(err).toBeInstanceOf(Error);
+  });
+});
 
 describe('formatWei', () => {
   it('formats zero', () => {

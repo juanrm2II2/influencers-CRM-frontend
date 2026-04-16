@@ -1,9 +1,10 @@
 'use client';
 
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, useSwitchChain } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
 import { useState, useCallback, useMemo } from 'react';
 import { TOKEN_SALE_ABI, VESTING_ABI, CONTRACT_ADDRESSES } from './contracts';
+import { EXPECTED_CHAIN_ID } from './config';
 import type { TokenSaleInfo, VestingSchedule, TransactionState, KycVerification, KycStatus } from '@/types/web3';
 import { getKycStatus, createKycAccessToken } from '@/lib/kyc';
 
@@ -33,6 +34,45 @@ function deriveTransactionState(
     };
   }
   return writeState;
+}
+
+// ─── Chain-ID guard: ensure the wallet is on the expected network ────────────
+
+export class ChainMismatchError extends Error {
+  constructor(
+    public readonly expected: number,
+    public readonly actual: number | undefined,
+  ) {
+    super(
+      actual === undefined
+        ? 'Wallet is not connected to any network'
+        : `Wrong network: expected chain ${expected} but wallet is on chain ${actual}`,
+    );
+    this.name = 'ChainMismatchError';
+  }
+}
+
+/**
+ * Returns an async helper that verifies the wallet is on {@link EXPECTED_CHAIN_ID}.
+ * If the chain is wrong it will attempt to switch automatically via
+ * `useSwitchChain`. If switching fails (user rejection, unsupported chain, …)
+ * a {@link ChainMismatchError} is thrown so callers can surface it in the UI.
+ */
+export function useChainGuard() {
+  const { chainId } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
+
+  const ensureCorrectChain = useCallback(async () => {
+    if (chainId === EXPECTED_CHAIN_ID) return;
+
+    try {
+      await switchChainAsync({ chainId: EXPECTED_CHAIN_ID });
+    } catch {
+      throw new ChainMismatchError(EXPECTED_CHAIN_ID, chainId);
+    }
+  }, [chainId, switchChainAsync]);
+
+  return { ensureCorrectChain };
 }
 
 // ─── Token Sale Info ─────────────────────────────────────────────────────────
@@ -124,6 +164,7 @@ export function useWhitelistStatus(address: `0x${string}` | undefined) {
 export function useContribute() {
   const [writeState, setWriteState] = useState<WriteState>({ status: 'idle' });
   const { writeContractAsync } = useWriteContract();
+  const { ensureCorrectChain } = useChainGuard();
 
   const { data: receipt } = useWaitForTransactionReceipt({
     hash: writeState.hash,
@@ -136,6 +177,7 @@ export function useContribute() {
     async (amountEth: string) => {
       try {
         setWriteState({ status: 'pending' });
+        await ensureCorrectChain();
         const value = parseEther(amountEth);
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.tokenSale,
@@ -149,7 +191,7 @@ export function useContribute() {
         setWriteState({ status: 'failed', error: message });
       }
     },
-    [writeContractAsync],
+    [writeContractAsync, ensureCorrectChain],
   );
 
   const reset = useCallback(() => setWriteState({ status: 'idle' }), []);
@@ -204,6 +246,7 @@ export function useReleasableAmount(address: `0x${string}` | undefined) {
 export function useClaimVestedTokens() {
   const [writeState, setWriteState] = useState<WriteState>({ status: 'idle' });
   const { writeContractAsync } = useWriteContract();
+  const { ensureCorrectChain } = useChainGuard();
 
   const { data: receipt } = useWaitForTransactionReceipt({
     hash: writeState.hash,
@@ -215,6 +258,7 @@ export function useClaimVestedTokens() {
   const claim = useCallback(async () => {
     try {
       setWriteState({ status: 'pending' });
+      await ensureCorrectChain();
       const hash = await writeContractAsync({
         address: CONTRACT_ADDRESSES.vesting,
         abi: VESTING_ABI,
@@ -225,7 +269,7 @@ export function useClaimVestedTokens() {
       const message = err instanceof Error ? err.message : 'Transaction failed';
       setWriteState({ status: 'failed', error: message });
     }
-  }, [writeContractAsync]);
+  }, [writeContractAsync, ensureCorrectChain]);
 
   const reset = useCallback(() => setWriteState({ status: 'idle' }), []);
 
@@ -237,6 +281,7 @@ export function useClaimVestedTokens() {
 export function useWhitelistManagement() {
   const [writeState, setWriteState] = useState<WriteState>({ status: 'idle' });
   const { writeContractAsync } = useWriteContract();
+  const { ensureCorrectChain } = useChainGuard();
 
   const { data: receipt } = useWaitForTransactionReceipt({
     hash: writeState.hash,
@@ -249,6 +294,7 @@ export function useWhitelistManagement() {
     async (accounts: `0x${string}`[], maxContributions: bigint[]) => {
       try {
         setWriteState({ status: 'pending' });
+        await ensureCorrectChain();
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.tokenSale,
           abi: TOKEN_SALE_ABI,
@@ -261,13 +307,14 @@ export function useWhitelistManagement() {
         setWriteState({ status: 'failed', error: message });
       }
     },
-    [writeContractAsync],
+    [writeContractAsync, ensureCorrectChain],
   );
 
   const removeFromWhitelist = useCallback(
     async (accounts: `0x${string}`[]) => {
       try {
         setWriteState({ status: 'pending' });
+        await ensureCorrectChain();
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.tokenSale,
           abi: TOKEN_SALE_ABI,
@@ -280,7 +327,7 @@ export function useWhitelistManagement() {
         setWriteState({ status: 'failed', error: message });
       }
     },
-    [writeContractAsync],
+    [writeContractAsync, ensureCorrectChain],
   );
 
   const reset = useCallback(() => setWriteState({ status: 'idle' }), []);

@@ -1,5 +1,5 @@
 // components/web3/ContributionForm.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { useContribute, useKycVerification } from '@/lib/web3/hooks';
 
@@ -11,6 +11,10 @@ export default function ContributionForm(): JSX.Element {
   const [amount, setAmount] = useState<string>('');
   const [inputError, setInputError] = useState<string>('');
 
+  const handleReset = useCallback(() => {
+    reset();
+    setAmount('');
+  }, [reset]);
   useEffect(() => {
     if (isConnected && address) {
       fetchStatus();
@@ -102,7 +106,7 @@ export default function ContributionForm(): JSX.Element {
       {txState.status === 'confirmed' && (
         <button
           type="button"
-          onClick={() => { reset(); setAmount(''); }}
+          onClick={handleReset}
           className="text-sm text-blue-600 hover:text-blue-800 underline"
         >
           Make another contribution

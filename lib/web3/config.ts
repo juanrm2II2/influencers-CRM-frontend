@@ -18,8 +18,8 @@ export const supportedChains = [mainnet, polygon, arbitrum, base, sepolia] as co
 export const EXPECTED_CHAIN_ID: number = (() => {
   const raw = process.env.NEXT_PUBLIC_EXPECTED_CHAIN_ID;
   if (raw) {
-    const parsed = Number(raw);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    const parsed = parseInt(raw, 10);
+    if (Number.isInteger(parsed) && parsed > 0) return parsed;
   }
   return mainnet.id;
 })();

@@ -45,4 +45,10 @@ describe('EXPECTED_CHAIN_ID', () => {
     const { EXPECTED_CHAIN_ID } = await import('../config');
     expect(EXPECTED_CHAIN_ID).toBe(1);
   });
+
+  it('falls back to mainnet for decimal values', async () => {
+    process.env.NEXT_PUBLIC_EXPECTED_CHAIN_ID = '1.5';
+    const { EXPECTED_CHAIN_ID } = await import('../config');
+    expect(EXPECTED_CHAIN_ID).toBe(1);
+  });
 });

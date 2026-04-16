@@ -9,6 +9,22 @@ import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 export const supportedChains = [mainnet, polygon, arbitrum, base, sepolia] as const;
 
 /**
+ * The chain ID that the deployed contracts live on.
+ * Every write transaction MUST target this chain; hooks will prompt the
+ * user to switch if their wallet is on a different network.
+ *
+ * Defaults to Ethereum mainnet (1) when the env var is not set.
+ */
+export const EXPECTED_CHAIN_ID: number = (() => {
+  const raw = process.env.NEXT_PUBLIC_EXPECTED_CHAIN_ID;
+  if (raw) {
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return mainnet.id;
+})();
+
+/**
  * Wagmi + RainbowKit configuration.
  *
  * Environment variables:

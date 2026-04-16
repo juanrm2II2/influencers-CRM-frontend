@@ -12,20 +12,6 @@ vi.mock('@/lib/web3/hooks', () => ({
     contribute: vi.fn(),
     reset: vi.fn(),
   }),
-  useTokenSaleInfo: () => ({
-    saleInfo: null,
-    isLoading: false,
-    error: null,
-  }),
-  useWhitelistStatus: () => ({
-    isWhitelisted: false,
-    maxContribution: 0n,
-    isLoading: false,
-  }),
-  useUserContribution: () => ({
-    contribution: 0n,
-    isLoading: false,
-  }),
   useKycVerification: () => ({
     verification: { status: 'none' },
     isVerified: false,
@@ -34,7 +20,6 @@ vi.mock('@/lib/web3/hooks', () => ({
     fetchStatus: vi.fn(),
     requestToken: vi.fn(),
   }),
-  formatWei: (v: bigint) => v.toString(),
 }));
 
 import ContributionForm from '../ContributionForm';
@@ -62,31 +47,6 @@ describe('ContributionForm - connected but not KYC verified', () => {
         contribute: vi.fn(),
         reset: vi.fn(),
       }),
-      useTokenSaleInfo: () => ({
-        saleInfo: {
-          totalTokens: 1000000n,
-          tokensSold: 0n,
-          tokenPrice: 100n,
-          hardCap: 1000n,
-          softCap: 500n,
-          totalRaised: 0n,
-          startTime: 0,
-          endTime: 0,
-          isActive: true,
-          isPaused: false,
-        },
-        isLoading: false,
-        error: null,
-      }),
-      useWhitelistStatus: () => ({
-        isWhitelisted: true,
-        maxContribution: 1000n,
-        isLoading: false,
-      }),
-      useUserContribution: () => ({
-        contribution: 0n,
-        isLoading: false,
-      }),
       useKycVerification: () => ({
         verification: { status: 'none' },
         isVerified: false,
@@ -95,7 +55,6 @@ describe('ContributionForm - connected but not KYC verified', () => {
         fetchStatus: vi.fn(),
         requestToken: vi.fn(),
       }),
-      formatWei: (v: bigint) => v.toString(),
     }));
 
     const { default: ContributionFormConnected } = await import('../ContributionForm');
@@ -123,31 +82,6 @@ describe('ContributionForm - connected and KYC verified', () => {
         contribute: vi.fn(),
         reset: vi.fn(),
       }),
-      useTokenSaleInfo: () => ({
-        saleInfo: {
-          totalTokens: 1000000n,
-          tokensSold: 0n,
-          tokenPrice: 100n,
-          hardCap: 1000n,
-          softCap: 500n,
-          totalRaised: 0n,
-          startTime: 0,
-          endTime: 0,
-          isActive: true,
-          isPaused: false,
-        },
-        isLoading: false,
-        error: null,
-      }),
-      useWhitelistStatus: () => ({
-        isWhitelisted: true,
-        maxContribution: 1000n,
-        isLoading: false,
-      }),
-      useUserContribution: () => ({
-        contribution: 0n,
-        isLoading: false,
-      }),
       useKycVerification: () => ({
         verification: { status: 'approved' },
         isVerified: true,
@@ -156,7 +90,6 @@ describe('ContributionForm - connected and KYC verified', () => {
         fetchStatus: vi.fn(),
         requestToken: vi.fn(),
       }),
-      formatWei: (v: bigint) => v.toString(),
     }));
 
     const { default: ContributionFormConnected } = await import('../ContributionForm');

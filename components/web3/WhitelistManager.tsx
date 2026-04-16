@@ -65,11 +65,20 @@ function parseRemoveInput(raw: string): { addresses: `0x${string}`[]; errors: st
 }
 
 export default function WhitelistManager() {
-  const { hasRole } = useAuth();
+  const { hasRole, isLoading } = useAuth();
   const { txState, addToWhitelist, removeFromWhitelist, reset } = useWhitelistManagement();
   const [mode, setMode] = useState<'add' | 'remove'>('add');
   const [input, setInput] = useState('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  // Wait for server-side role verification before granting access (F-02).
+  if (isLoading) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
+        <p className="text-gray-500 text-sm">Verifying permissions…</p>
+      </div>
+    );
+  }
 
   if (!hasRole('admin')) {
     return (

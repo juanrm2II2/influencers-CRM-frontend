@@ -94,6 +94,9 @@ describe('Integration: Auth flow + CRUD', () => {
   it('complete auth flow: login → CRUD operations → logout', async () => {
     const userObj = { id: '1', email: 'test@example.com', name: 'Test User', role: 'admin' };
 
+    // Mock session verify (mount effect) – no active session
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
     // Mock successful login
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -157,6 +160,9 @@ describe('Integration: Auth flow + CRUD', () => {
   });
 
   it('login failure does not authenticate user', async () => {
+    // Mock session verify (mount effect) – no active session
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,

@@ -10,16 +10,20 @@ vi.mock('wagmi', () => ({
   useWaitForTransactionReceipt: () => ({ data: undefined }),
 }));
 
-// Mock AuthContext
+// Mock AuthContext – use a mutable ref so per-test overrides are possible
+const defaultAuth = {
+  user: { id: '1', email: 'admin@test.com', name: 'Admin', role: 'admin' as const },
+  isAuthenticated: true,
+  isLoading: false,
+  hasRole: (role: string) => role === 'admin',
+  login: vi.fn(),
+  logout: vi.fn(),
+};
+
+let mockAuth = { ...defaultAuth };
+
 vi.mock('@/context/AuthContext', () => ({
-  useAuth: () => ({
-    user: { id: '1', email: 'admin@test.com', name: 'Admin', role: 'admin' },
-    isAuthenticated: true,
-    isLoading: false,
-    hasRole: (role: string) => role === 'admin',
-    login: vi.fn(),
-    logout: vi.fn(),
-  }),
+  useAuth: () => mockAuth,
 }));
 
 // Mock the hooks
@@ -35,6 +39,10 @@ vi.mock('@/lib/web3/hooks', () => ({
 import WhitelistManager from '../WhitelistManager';
 
 describe('WhitelistManager', () => {
+  beforeEach(() => {
+    mockAuth = { ...defaultAuth };
+  });
+
   it('renders the form for admin users', () => {
     render(<WhitelistManager />);
     expect(screen.getByText('Whitelist Management')).toBeInTheDocument();
@@ -82,5 +90,24 @@ describe('WhitelistManager', () => {
     const submitBtn = screen.getByRole('button', { name: 'Add to whitelist' });
     await user.click(submitBtn);
     expect(screen.getByText(/expected "address, maxETH"/)).toBeInTheDocument();
+  });
+
+  // F-02: access control tests
+  it('shows loading indicator while role is being verified', () => {
+    mockAuth = { ...defaultAuth, isLoading: true };
+    render(<WhitelistManager />);
+    expect(screen.getByText('Verifying permissions…')).toBeInTheDocument();
+    expect(screen.queryByText('Whitelist Management')).not.toBeInTheDocument();
+  });
+
+  it('shows access denied for non-admin users', () => {
+    mockAuth = {
+      ...defaultAuth,
+      user: { id: '2', email: 'viewer@test.com', name: 'Viewer', role: 'viewer' as const },
+      hasRole: () => false,
+    };
+    render(<WhitelistManager />);
+    expect(screen.getByText('Access denied')).toBeInTheDocument();
+    expect(screen.queryByText('Whitelist Management')).not.toBeInTheDocument();
   });
 });

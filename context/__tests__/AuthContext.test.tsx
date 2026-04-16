@@ -169,6 +169,9 @@ describe("AuthContext", () => {
         role: "admin",
       };
 
+      // 1st fetch: GET /api/auth/me (mount verify) → no session
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+      // 2nd fetch: POST /api/auth/login
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ user: userObj }),
@@ -190,6 +193,9 @@ describe("AuthContext", () => {
     });
 
     it("handles failed login with server message", async () => {
+      // 1st fetch: verify → no session
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+      // 2nd fetch: login → 401
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
@@ -210,6 +216,9 @@ describe("AuthContext", () => {
     });
 
     it("handles failed login with no JSON body", async () => {
+      // 1st fetch: verify → no session
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+      // 2nd fetch: login → 500
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -358,6 +367,117 @@ describe("AuthContext", () => {
         expect(screen.getByTestId("has-admin").textContent).toBe("false");
         expect(screen.getByTestId("has-viewer").textContent).toBe("false");
       });
+    });
+  });
+
+  // -----------------------------
+  // Session verification (F-02)
+  // -----------------------------
+  describe("session verification (F-02)", () => {
+    it("overrides tampered sessionStorage role with server-verified role", async () => {
+      // Attacker sets admin in sessionStorage
+      sessionStorage.setItem(
+        "crm_user",
+        JSON.stringify({
+          id: "1",
+          email: "a@b.com",
+          name: "Attacker",
+          role: "admin",
+        })
+      );
+
+      // Backend returns the real role: viewer
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          user: { id: "1", email: "a@b.com", name: "Attacker", role: "viewer" },
+        }),
+      });
+
+      renderWithProvider(<TestConsumer />);
+
+      // After verification, admin should be denied
+      await waitFor(() => {
+        expect(screen.getByTestId("loading").textContent).toBe("false");
+        expect(screen.getByTestId("has-admin").textContent).toBe("false");
+        expect(screen.getByTestId("has-viewer").textContent).toBe("true");
+      });
+    });
+
+    it("clears user when backend returns 401", async () => {
+      sessionStorage.setItem(
+        "crm_user",
+        JSON.stringify({
+          id: "1",
+          email: "a@b.com",
+          name: "Stale",
+          role: "admin",
+        })
+      );
+
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+      renderWithProvider(<TestConsumer />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("loading").textContent).toBe("false");
+        expect(screen.getByTestId("authenticated").textContent).toBe("false");
+        expect(screen.getByTestId("user").textContent).toBe("null");
+      });
+    });
+
+    it("keeps cached user on network error (graceful degradation)", async () => {
+      const cachedUser = {
+        id: "1",
+        email: "a@b.com",
+        name: "Cached",
+        role: "manager",
+      };
+      sessionStorage.setItem("crm_user", JSON.stringify(cachedUser));
+
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      renderWithProvider(<TestConsumer />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("loading").textContent).toBe("false");
+        expect(screen.getByTestId("authenticated").textContent).toBe("true");
+        expect(screen.getByTestId("has-manager").textContent).toBe("true");
+      });
+    });
+
+    it("persists server-verified user to sessionStorage", async () => {
+      sessionStorage.setItem(
+        "crm_user",
+        JSON.stringify({
+          id: "1",
+          email: "a@b.com",
+          name: "Old",
+          role: "admin",
+        })
+      );
+
+      const serverUser = {
+        id: "1",
+        email: "a@b.com",
+        name: "ServerVerified",
+        role: "viewer",
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ user: serverUser }),
+      });
+
+      renderWithProvider(<TestConsumer />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("loading").textContent).toBe("false");
+      });
+
+      const stored = JSON.parse(sessionStorage.getItem("crm_user")!);
+      expect(stored.name).toBe("ServerVerified");
+      expect(stored.role).toBe("viewer");
     });
   });
 });

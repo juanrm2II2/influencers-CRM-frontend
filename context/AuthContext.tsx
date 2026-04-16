@@ -73,17 +73,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Rehydrate user from sessionStorage on mount.
+  // Rehydrate user from sessionStorage on mount, then verify against the
+  // backend so that a tampered sessionStorage role is overridden by the
+  // server-authoritative value (F-02 hardening).
   // SSR-safe: must run after hydration to avoid server/client mismatch.
-  /* eslint-disable react-hooks/set-state-in-effect -- One-time post-hydration init from browser sessionStorage */
   useEffect(() => {
     const storedUser = loadUser();
     if (storedUser) {
       setUser(storedUser);
     }
-    setIsLoading(false);
+
+    // Verify session with the backend to get the server-authoritative role.
+    // On success the cached profile is replaced; on 401 the session is
+    // cleared; on network error the cached value is kept as a graceful
+    // degradation (on-chain enforcement is the ultimate guard).
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/me`, {
+          credentials: 'include',
+        });
+
+        if (res.ok) {
+          const data = (await res.json()) as { user: User };
+          setUser(data.user);
+          persistUser(data.user);
+        } else if (res.status === 401) {
+          // Token expired or invalid – clear cached state
+          setUser(null);
+          clearUser();
+        }
+        // Other status codes: keep cached user (server transient error)
+      } catch {
+        // Network error – keep cached user for offline tolerance
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const login = useCallback(
     async (credentials: LoginCredentials) => {

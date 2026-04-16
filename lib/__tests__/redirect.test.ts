@@ -30,7 +30,10 @@ describe('isSafeRedirectPath', () => {
     expect(isSafeRedirectPath('/foo\\bar')).toBe(false);
   });
 
-  it('rejects embedded scheme in path', () => {
+  it('rejects paths containing "://" as defense-in-depth', () => {
+    // The middleware only passes pathname (no query string), so this
+    // pattern would not normally occur.  Rejecting it anyway prevents
+    // misuse if the helper is called with a full URL string elsewhere.
     expect(isSafeRedirectPath('/foo?url=https://evil.com')).toBe(false);
   });
 });

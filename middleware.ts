@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { CSP_HEADER_NAME, buildCspHeaderValue } from '@/lib/csp';
+import { isSafeRedirectPath } from '@/lib/redirect';
 
 // Routes that don't require authentication
 const PUBLIC_PATHS = ['/login', '/privacy', '/terms', '/cookie-policy', '/dpa', '/data-practices'];
@@ -42,7 +43,9 @@ export function middleware(request: NextRequest) {
 
   if (!isPublic && !token) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
+    if (isSafeRedirectPath(pathname)) {
+      loginUrl.searchParams.set('redirect', pathname);
+    }
     const response = NextResponse.redirect(loginUrl);
     applySecurityHeaders(response);
     return response;

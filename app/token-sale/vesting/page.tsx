@@ -10,6 +10,12 @@ const Web3Provider = dynamic(() => import('@/components/web3/Web3Provider'), {
   ssr: false,
 });
 
+// app/token-sale/vesting/page.tsx
+
+export const dynamic = 'force-dynamic';
+
+// ... rest of the page component
+
 export default function VestingPage() {
   return (
     <Web3Provider>

@@ -78,6 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // server-authoritative value (F-02 hardening).
   // SSR-safe: must run after hydration to avoid server/client mismatch.
   useEffect(() => {
+    const controller = new AbortController();
+
     const storedUser = loadUser();
     if (storedUser) {
       setUser(storedUser);
@@ -91,7 +93,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const res = await fetch(`${API_URL}/api/auth/me`, {
           credentials: 'include',
+          signal: controller.signal,
         });
+
+        if (controller.signal.aborted) return;
 
         if (res.ok) {
           const data = (await res.json()) as { user: User };
@@ -104,11 +109,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         // Other status codes: keep cached user (server transient error)
       } catch {
-        // Network error – keep cached user for offline tolerance
+        // Network error or aborted – keep cached user for offline tolerance
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     })();
+
+    return () => controller.abort();
   }, []);
 
   const login = useCallback(

@@ -3,6 +3,8 @@ import "./globals.css";
 import Providers from "@/components/Providers";
 import CookieConsent from "@/components/CookieConsent";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: "Influencer CRM",
   description: "Manage your influencer partnerships",

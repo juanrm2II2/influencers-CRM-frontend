@@ -2,6 +2,14 @@ import { http } from 'wagmi';
 import { mainnet, polygon, arbitrum, base, sepolia } from 'wagmi/chains';
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 
+
+export const config = getDefaultConfig({
+  appName: 'xendaya',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
+  chains: [mainnet],
+});
+
+
 /**
  * Supported chains – production networks + Sepolia for testing.
  * The first chain is the default.

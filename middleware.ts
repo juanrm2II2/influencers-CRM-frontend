@@ -1,8 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { CSP_HEADER_NAME, buildCspHeaderValue } from '@/lib/csp';
+import { API_URL } from '@/lib/config';
 
 // Routes that don't require authentication
 const PUBLIC_PATHS = ['/login', '/privacy', '/terms', '/cookie-policy', '/dpa', '/data-practices'];
+
+// Routes that additionally require the authenticated user to have `role === 'admin'`.
+// This list is the server-authoritative source of admin-gated pages.
+const ADMIN_PATHS = ['/token-sale/whitelist'];
 
 // ─── Security headers (F-004) ──────────────────────────────────────────────
 
@@ -17,7 +22,7 @@ const SECURITY_HEADERS: Record<string, string> = {
     'max-age=63072000; includeSubDomains; preload',
 };
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip internal Next.js assets and API routes
@@ -30,10 +35,8 @@ export function middleware(request: NextRequest) {
   }
 
   // ── Route-level auth guard ──────────────────────────────────────────────
-  // NOTE: This is a UX-level guard that checks for token *presence* only.
-  // Actual JWT signature / expiration validation happens on the backend for
-  // every API call.  Adding server-side JWT verification here would require
-  // sharing the signing secret with the frontend, which is not recommended.
+  // NOTE: Token-presence check below is a UX-level guard only; JWT signature
+  // and expiration validation happen on the backend for every API call.
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p);
 
   const token =
@@ -57,9 +60,53 @@ export function middleware(request: NextRequest) {
     return response;
   }
 
+  // ── Admin-only guard (server-authoritative role check) ─────────────────
+  // For admin-gated paths we *cannot* trust the client-side role: we must ask
+  // the backend who the authenticated user is. The backend is the only party
+  // that can validate the session JWT and return the real role.
+  const isAdminPath = ADMIN_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (isAdminPath && token) {
+    const role = await fetchAuthenticatedRole(request);
+    if (role !== 'admin') {
+      // Non-admin (or unauthenticated-per-backend) → redirect to token-sale root.
+      const redirectUrl = new URL('/token-sale', request.url);
+      const response = NextResponse.redirect(redirectUrl);
+      applySecurityHeaders(response);
+      return response;
+    }
+  }
+
   const response = NextResponse.next();
   applySecurityHeaders(response);
   return response;
+}
+
+/**
+ * Resolve the authenticated user's role by calling the backend's
+ * `/api/auth/me` endpoint. Forwards cookies so the backend can validate the
+ * session. Returns `null` when the backend rejects the request or is
+ * unreachable, in which case callers should treat the user as unauthorized.
+ */
+async function fetchAuthenticatedRole(request: NextRequest): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/auth/me`, {
+      method: 'GET',
+      headers: {
+        // Forward the incoming cookies so the backend sees the user's session.
+        cookie: request.headers.get('cookie') ?? '',
+        accept: 'application/json',
+      },
+      // Edge runtime: avoid caching auth responses.
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = (await res.json().catch(() => null)) as
+      | { user?: { role?: string }; role?: string }
+      | null;
+    return data?.user?.role ?? data?.role ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function applySecurityHeaders(response: NextResponse): void {

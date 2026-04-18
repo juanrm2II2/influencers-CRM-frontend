@@ -94,6 +94,13 @@ describe('Integration: Auth flow + CRUD', () => {
   it('complete auth flow: login → CRUD operations → logout', async () => {
     const userObj = { id: '1', email: 'test@example.com', name: 'Test User', role: 'admin' };
 
+    // First fetch on mount: /api/auth/me rehydration (no session yet → 401).
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({}),
+    });
+
     // Mock successful login
     mockFetch.mockResolvedValueOnce({
       ok: true,

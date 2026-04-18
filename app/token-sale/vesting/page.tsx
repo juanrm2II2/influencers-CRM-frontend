@@ -1,14 +1,19 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+export const dynamic = 'force-dynamic';
+import dynamicImport from 'next/dynamic';
 import ConnectWallet from '@/components/web3/ConnectWallet';
+import SaleProgressDashboard from '@/components/web3/SaleProgressDashboard';
+import ContributionForm from '@/components/web3/ContributionForm';
+import KycVerificationBanner from '@/components/web3/KycVerificationBanner';
 import VestingScheduleComponent from '@/components/web3/VestingSchedule';
 import UserMenu from '@/components/UserMenu';
 import Footer from '@/components/Footer';
 
-const Web3Provider = dynamic(() => import('@/components/web3/Web3Provider'), {
+const Web3Provider = dynamicImport(() => import('@/components/web3/Web3Provider'), {
   ssr: false,
 });
+
 
 export default function VestingPage() {
   return (

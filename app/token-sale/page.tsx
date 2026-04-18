@@ -9,7 +9,7 @@ import KycVerificationBanner from '@/components/web3/KycVerificationBanner';
 import UserMenu from '@/components/UserMenu';
 import Footer from '@/components/Footer';
 
-const Web3Provider = dynamic(() => import('@/components/web3/Web3Provider'), {
+const Web3Provider = dynamicImport(() => import('@/components/web3/Web3Provider'), {
   ssr: false,
 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import dynamicImport from 'next/dynamic';
+import dynamic from 'next/dynamic';
 import ConnectWallet from '@/components/web3/ConnectWallet';
 import VestingScheduleComponent from '@/components/web3/VestingSchedule';
 import UserMenu from '@/components/UserMenu';
@@ -9,12 +9,6 @@ import Footer from '@/components/Footer';
 const Web3Provider = dynamic(() => import('@/components/web3/Web3Provider'), {
   ssr: false,
 });
-
-// app/token-sale/vesting/page.tsx
-
-export const dynamic = 'force-dynamic';
-
-// ... rest of the page component
 
 export default function VestingPage() {
   return (

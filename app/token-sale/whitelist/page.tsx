@@ -9,6 +9,7 @@ import KycVerificationBanner from '@/components/web3/KycVerificationBanner';
 import VestingScheduleComponent from '@/components/web3/VestingSchedule';
 import UserMenu from '@/components/UserMenu';
 import Footer from '@/components/Footer';
+import WhitelistManager from '@/components/web3/WhitelistManager';
 
 const Web3Provider = dynamicImport(() => import('@/components/web3/Web3Provider'), {
   ssr: false,

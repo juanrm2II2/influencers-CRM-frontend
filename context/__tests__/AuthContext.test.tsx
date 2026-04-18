@@ -85,6 +85,15 @@ describe("AuthContext", () => {
     vi.clearAllMocks();
     sessionStorage.clear();
     mockPush.mockClear();
+    // Default: backend session rehydration returns 401. Individual tests
+    // override with mockResolvedValueOnce when they need a user.
+    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/auth/me')) {
+        return { ok: false, status: 401, json: async () => ({}) } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    });
   });
 
   afterEach(() => {
@@ -169,6 +178,13 @@ describe("AuthContext", () => {
         role: "admin",
       };
 
+      // First fetch is /api/auth/me on mount (no session yet → 401).
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({}),
+      });
+      // Second fetch is the login POST.
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ user: userObj }),

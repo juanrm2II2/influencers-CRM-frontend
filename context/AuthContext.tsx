@@ -73,17 +73,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Rehydrate user from sessionStorage on mount.
-  // SSR-safe: must run after hydration to avoid server/client mismatch.
-  /* eslint-disable react-hooks/set-state-in-effect -- One-time post-hydration init from browser sessionStorage */
+  // Rehydrate user from the backend (`/api/auth/me`) on mount. This replaces
+  // the previous sessionStorage-only rehydration so the role surfaced in the
+  // UI always matches what the backend has validated from the session
+  // cookie — never a value that a malicious browser context could have
+  // tampered with.
   useEffect(() => {
-    const storedUser = loadUser();
-    if (storedUser) {
-      setUser(storedUser);
-    }
-    setIsLoading(false);
+    let cancelled = false;
+
+    // Fall back to sessionStorage synchronously so the UI doesn't flash while
+    // the network request is in flight; the fetched value will overwrite it.
+    const cached = loadUser();
+    if (cached) setUser(cached);
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/me`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+        });
+        if (!res.ok) {
+          // Backend rejected the session (missing/expired). Clear local state.
+          if (!cancelled) {
+            setUser(null);
+            clearUser();
+          }
+          return;
+        }
+        const data = (await res.json()) as { user?: User } | User | null;
+        const fresh = (data && 'user' in data ? data.user : (data as User | null)) ?? null;
+        if (!cancelled) {
+          if (fresh) {
+            setUser(fresh);
+            persistUser(fresh);
+          } else {
+            setUser(null);
+            clearUser();
+          }
+        }
+      } catch {
+        // Network error – keep the cached user (if any) but don't promote it
+        // to an authoritative state; `isAuthenticated` still reflects it.
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const login = useCallback(
     async (credentials: LoginCredentials) => {

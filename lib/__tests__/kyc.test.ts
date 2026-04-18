@@ -19,16 +19,29 @@ describe('getKycStatus', () => {
       json: () => Promise.resolve(mockData),
     });
 
-    const result = await getKycStatus('0x1234567890123456789012345678901234567890');
+    const result = await getKycStatus();
 
     expect(fetch).toHaveBeenCalledWith(
-      `${MOCK_API_URL}/api/kyc/status?wallet=0x1234567890123456789012345678901234567890`,
+      `${MOCK_API_URL}/api/kyc/status`,
       expect.objectContaining({
         method: 'GET',
         credentials: 'include',
       }),
     );
     expect(result).toEqual(mockData);
+  });
+
+  it('does not include a wallet query parameter in the request URL', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ status: 'none' }),
+    });
+
+    await getKycStatus();
+
+    const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(url).not.toContain('wallet=');
+    expect(url).not.toContain('?');
   });
 
   it('throws an error when the response is not ok', async () => {
@@ -38,9 +51,7 @@ describe('getKycStatus', () => {
       json: () => Promise.resolve({ message: 'Unauthorized' }),
     });
 
-    await expect(
-      getKycStatus('0x1234567890123456789012345678901234567890'),
-    ).rejects.toThrow('Unauthorized');
+    await expect(getKycStatus()).rejects.toThrow('Unauthorized');
   });
 
   it('throws a generic error when the body has no message', async () => {
@@ -50,9 +61,7 @@ describe('getKycStatus', () => {
       json: () => Promise.reject(new Error('parse error')),
     });
 
-    await expect(
-      getKycStatus('0x1234567890123456789012345678901234567890'),
-    ).rejects.toThrow('Failed to fetch KYC status (500)');
+    await expect(getKycStatus()).rejects.toThrow('Failed to fetch KYC status (500)');
   });
 });
 
@@ -72,17 +81,31 @@ describe('createKycAccessToken', () => {
       json: () => Promise.resolve(mockToken),
     });
 
-    const result = await createKycAccessToken('0x1234567890123456789012345678901234567890');
+    const result = await createKycAccessToken();
 
     expect(fetch).toHaveBeenCalledWith(
       `${MOCK_API_URL}/api/kyc/token`,
       expect.objectContaining({
         method: 'POST',
         credentials: 'include',
-        body: JSON.stringify({ wallet: '0x1234567890123456789012345678901234567890' }),
       }),
     );
     expect(result).toEqual(mockToken);
+  });
+
+  it('does not include a wallet field in the request body', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ token: 't', applicantId: 'a' }),
+    });
+
+    await createKycAccessToken();
+
+    const init = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit | undefined;
+    // Body is either omitted entirely or does not carry a `wallet` field.
+    if (init?.body != null) {
+      expect(String(init.body)).not.toContain('wallet');
+    }
   });
 
   it('throws an error when the response is not ok', async () => {
@@ -92,8 +115,6 @@ describe('createKycAccessToken', () => {
       json: () => Promise.resolve({ message: 'Forbidden' }),
     });
 
-    await expect(
-      createKycAccessToken('0x1234567890123456789012345678901234567890'),
-    ).rejects.toThrow('Forbidden');
+    await expect(createKycAccessToken()).rejects.toThrow('Forbidden');
   });
 });

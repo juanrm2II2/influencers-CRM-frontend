@@ -1,12 +1,13 @@
 'use client';
 
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, useSwitchChain } from 'wagmi';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, useSwitchChain, useSignMessage, useChainId } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
 import { useState, useCallback, useMemo } from 'react';
 import { TOKEN_SALE_ABI, VESTING_ABI, CONTRACT_ADDRESSES } from './contracts';
 import { EXPECTED_CHAIN_ID } from './config';
 import type { TokenSaleInfo, VestingSchedule, TransactionState, KycVerification, KycStatus } from '@/types/web3';
 import { getKycStatus, createKycAccessToken } from '@/lib/kyc';
+import { performSiwe } from './siwe';
 
 // ─── Shared helper: derive final tx state from write-state + receipt ─────────
 
@@ -335,6 +336,50 @@ export function useWhitelistManagement() {
   return { txState, addToWhitelist, removeFromWhitelist, reset };
 }
 
+// ─── SIWE: bind connected wallet to the backend session ─────────────────────
+
+/**
+ * Hook that exposes the SIWE flow. Call `signIn()` after the wallet is
+ * connected (and the user has an authenticated backend session). On success
+ * the backend associates the wallet with the session and subsequent API
+ * calls (e.g. KYC) can rely on the session wallet — no `wallet` query
+ * parameter or body field is needed from the client.
+ */
+export function useSiwe() {
+  const { address } = useAccount();
+  const chainId = useChainId();
+  const { signMessageAsync } = useSignMessage();
+  const [status, setStatus] = useState<'idle' | 'signing' | 'verifying' | 'success' | 'error'>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  const signIn = useCallback(async () => {
+    if (!address) throw new Error('Wallet not connected');
+    setError(null);
+    try {
+      setStatus('signing');
+      await performSiwe({
+        address,
+        chainId,
+        signMessage: async ({ message, account }) =>
+          signMessageAsync({ message, account }),
+      });
+      setStatus('success');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'SIWE sign-in failed';
+      setError(message);
+      setStatus('error');
+      throw err;
+    }
+  }, [address, chainId, signMessageAsync]);
+
+  const reset = useCallback(() => {
+    setStatus('idle');
+    setError(null);
+  }, []);
+
+  return { status, error, signIn, reset };
+}
+
 // ─── KYC verification ────────────────────────────────────────────────────────
 
 export function useKycVerification(address: `0x${string}` | undefined) {
@@ -342,12 +387,15 @@ export function useKycVerification(address: `0x${string}` | undefined) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // `address` is retained in the signature so callers can gate fetches on
+  // wallet connection, but it is no longer sent to the backend — the backend
+  // resolves the wallet from the SIWE-bound session.
   const fetchStatus = useCallback(async () => {
     if (!address) return;
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getKycStatus(address);
+      const data = await getKycStatus();
       setVerification(data);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch KYC status';
@@ -359,7 +407,7 @@ export function useKycVerification(address: `0x${string}` | undefined) {
 
   const requestToken = useCallback(async () => {
     if (!address) throw new Error('Wallet not connected');
-    return createKycAccessToken(address);
+    return createKycAccessToken();
   }, [address]);
 
   return {

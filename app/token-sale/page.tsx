@@ -1,7 +1,7 @@
 'use client';
 
 export const dynamic = 'force-dynamic';
-import dynamic from 'next/dynamic';
+import dynamicImport from 'next/dynamic';
 import ConnectWallet from '@/components/web3/ConnectWallet';
 import SaleProgressDashboard from '@/components/web3/SaleProgressDashboard';
 import ContributionForm from '@/components/web3/ContributionForm';

@@ -76,7 +76,6 @@ export default function VestingSchedule() {
     return <TransactionReceipt txState={txState} onReset={reset} />;
   }
 
-  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
     // update periodically; pick interval that makes sense for your UI
     const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 30_000);

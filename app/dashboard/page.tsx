@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { getInfluencers } from '@/lib/api';
 import { Influencer, DashboardFilters } from '@/types';
 import InfluencerCard from '@/components/InfluencerCard';
@@ -22,23 +22,33 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const fetchInfluencers = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getInfluencers(filters);
-      setInfluencers(data);
-    } catch {
-      setError('Failed to load influencers. Make sure the backend is running.');
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
+  useEffect(() => { /* fetch */ }, [filters, refreshKey]);
+
+  // Try again:
+  onClick={() => setRefreshKey((k) => k + 1)}
 
   useEffect(() => {
-    fetchInfluencers();
-  }, [fetchInfluencers]);
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const data = await getInfluencers(filters);
+        if (!cancelled) setInfluencers(data);
+      } catch {
+        if (!cancelled) setError('Failed to load influencers. Make sure the backend is running.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filters]);
 
   const filteredInfluencers = filters.search
     ? influencers.filter(

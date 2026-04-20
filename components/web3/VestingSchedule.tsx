@@ -1,6 +1,6 @@
 'use client';
 
-import { useAccount } from 'wagmi';
+import { useAccount, useEffect, useState } from 'wagmi';
 import {
   useVestingSchedule,
   useReleasableAmount,
@@ -67,7 +67,13 @@ export default function VestingSchedule() {
     return <TransactionReceipt txState={txState} onReset={reset} />;
   }
 
-  const now = Math.floor(Date.now() / 1000);
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    // update periodically; pick interval that makes sense for your UI
+    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   const cliffEnd = schedule.startTime + schedule.cliffDuration;
   const vestingEnd = schedule.startTime + schedule.vestingDuration;
   const isCliffPassed = now >= cliffEnd;

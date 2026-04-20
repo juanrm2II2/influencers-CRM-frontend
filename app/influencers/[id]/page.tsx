@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -53,23 +53,30 @@ export default function InfluencerDetailPage() {
   const [showOutreachModal, setShowOutreachModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const fetchInfluencer = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getInfluencer(id);
-      setInfluencer(data);
-      setNotes(data.notes || '');
-    } catch {
-      setError('Failed to load influencer.');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
   useEffect(() => {
-    if (id) fetchInfluencer();
-  }, [id, fetchInfluencer]);
+    if (!id) return;
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const data = await getInfluencer(id);
+        if (!cancelled) {
+          setInfluencer(data);
+          setNotes(data.notes || '');
+        }
+      } catch {
+        if (!cancelled) setError('Failed to load influencer.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   async function handleStatusChange(newStatus: Status) {
     if (!influencer) return;

@@ -83,8 +83,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Fall back to sessionStorage synchronously so the UI doesn't flash while
     // the network request is in flight; the fetched value will overwrite it.
-    const cached = loadUser();
-    if (cached) setUser(cached);
 
     (async () => {
       try {
@@ -94,16 +92,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           headers: { accept: 'application/json' },
           cache: 'no-store',
         });
+
         if (!res.ok) {
-          // Backend rejected the session (missing/expired). Clear local state.
           if (!cancelled) {
             setUser(null);
             clearUser();
           }
           return;
         }
+
         const data = (await res.json()) as { user?: User } | User | null;
         const fresh = (data && 'user' in data ? data.user : (data as User | null)) ?? null;
+
         if (!cancelled) {
           if (fresh) {
             setUser(fresh);
@@ -114,8 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch {
-        // Network error – keep the cached user (if any) but don't promote it
-        // to an authoritative state; `isAuthenticated` still reflects it.
+        // keep cached user if any
       } finally {
         if (!cancelled) setIsLoading(false);
       }

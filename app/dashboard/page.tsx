@@ -10,12 +10,6 @@ import AddInfluencerModal from '@/components/AddInfluencerModal';
 import UserMenu from '@/components/UserMenu';
 import Footer from '@/components/Footer';
 
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
-}
-
 export default function DashboardPage() {
   const [influencers, setInfluencers] = useState<Influencer[]>([]);
   const [filters, setFilters] = useState<DashboardFilters>({});
@@ -24,21 +18,25 @@ export default function DashboardPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-
   const fetchInfluencers = useCallback(
     async (signal?: AbortSignal) => {
-    setLoading(true);
-    setError('');
+      setLoading(true);
+      setError('');
 
-    try {
-      const data = await getInfluencers(filters);
-      setInfluencers(data);
-    } catch {
-      setError('Failed to load influencers. Make sure the backend is running.');
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
+      try {
+        // If getInfluencers doesn't accept a signal yet, update it to accept one.
+        const data = await getInfluencers(filters, { signal });
+        if (!signal?.aborted) setInfluencers(data);
+      } catch (e) {
+        if (!signal?.aborted) {
+          setError('Failed to load influencers. Make sure the backend is running.');
+        }
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [filters]
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -46,10 +44,10 @@ export default function DashboardPage() {
     return () => controller.abort();
   }, [fetchInfluencers, refreshKey]);
 
-  // ...
-  // In the error UI:
-  // <button onClick={fetchInfluencers}>Try again</button>
-
+  // ...rest of component
+  // For the error UI button, wrap it so it doesn't pass the click event:
+  // <button onClick={() => void fetchInfluencers()}>Try again</button>
+}
   useEffect(() => {
     let cancelled = false;
 
@@ -158,12 +156,7 @@ export default function DashboardPage() {
         ) : error ? (
           <div className="text-center py-20">
             <p className="text-red-600 mb-3">{error}</p>
-            <button
-              onClick={fetchInfluencers}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Try again
-            </button>
+	    <button onClick={() => void fetchInfluencers()}>Try again</button>
           </div>
         ) : filteredInfluencers.length === 0 ? (
           <div className="text-center py-20">

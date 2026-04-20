@@ -40,7 +40,9 @@ export default function DashboardPage() {
   }, [filters]);
 
   useEffect(() => {
-    void fetchInfluencers();
+    const controller = new AbortController();
+    void fetchInfluencers(controller.signal);
+    return () => controller.abort();
   }, [fetchInfluencers, refreshKey]);
 
   // ...

@@ -4,8 +4,6 @@ export const dynamic = 'force-dynamic';
 import dynamicImport from 'next/dynamic';
 import ConnectWallet from '@/components/web3/ConnectWallet';
 import SaleProgressDashboard from '@/components/web3/SaleProgressDashboard';
-import ContributionForm from '@/components/web3/ContributionForm';
-import KycVerificationBanner from '@/components/web3/KycVerificationBanner';
 import VestingScheduleComponent from '@/components/web3/VestingSchedule';
 import UserMenu from '@/components/UserMenu';
 import Footer from '@/components/Footer';

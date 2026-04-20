@@ -48,26 +48,6 @@ export default function DashboardPage() {
   // For the error UI button, wrap it so it doesn't pass the click event:
   // <button onClick={() => void fetchInfluencers()}>Try again</button>
 }
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const data = await getInfluencers(filters);
-        if (!cancelled) setInfluencers(data);
-      } catch {
-        if (!cancelled) setError('Failed to load influencers. Make sure the backend is running.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [filters]);
 
   const filteredInfluencers = filters.search
     ? influencers.filter(

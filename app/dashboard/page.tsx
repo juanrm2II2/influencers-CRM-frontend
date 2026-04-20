@@ -24,6 +24,28 @@ export default function DashboardPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
+
+  const fetchInfluencers = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getInfluencers(filters);
+      setInfluencers(data);
+    } catch {
+      setError('Failed to load influencers. Make sure the backend is running.');
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    void fetchInfluencers();
+  }, [fetchInfluencers]);
+
+  // ...
+  // In the error UI:
+  // <button onClick={fetchInfluencers}>Try again</button>
+
   useEffect(() => { /* fetch */ }, [filters, refreshKey]);
 
   useEffect(() => {

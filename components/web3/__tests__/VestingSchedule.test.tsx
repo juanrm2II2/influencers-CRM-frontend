@@ -2,9 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 // Mock wagmi
-vi.mock('wagmi', () => ({
-  useAccount: () => ({ address: undefined, isConnected: false }),
-}));
+vi.mock('wagmi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('wagmi')>();
+  return {
+    ...actual,
+    useAccount: () => ({ address: undefined, isConnected: false }),
+  };
+});
 
 vi.mock('@/lib/web3/hooks', () => ({
   useVestingSchedule: () => ({

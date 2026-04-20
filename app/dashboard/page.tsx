@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const fetchInfluencers = useCallback(async () => {
     setLoading(true);
     setError('');
+
     try {
       const data = await getInfluencers(filters);
       setInfluencers(data);
@@ -40,13 +41,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     void fetchInfluencers();
-  }, [fetchInfluencers]);
+  }, [fetchInfluencers, refreshKey]);
 
   // ...
   // In the error UI:
   // <button onClick={fetchInfluencers}>Try again</button>
-
-  useEffect(() => { /* fetch */ }, [filters, refreshKey]);
 
   useEffect(() => {
     let cancelled = false;

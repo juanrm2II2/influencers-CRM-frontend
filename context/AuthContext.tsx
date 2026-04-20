@@ -85,8 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // the network request is in flight; the fetched value will overwrite it.
 
   // Synchronous fallback from sessionStorage
-  const cached = loadUser();
-  if (cached) setUser(cached);
+  const [user, setUser] = useState<User | null>(() => loadUser());
 
   (async () => {
     try {

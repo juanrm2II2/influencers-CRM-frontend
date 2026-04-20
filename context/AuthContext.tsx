@@ -70,63 +70,55 @@ const ROLE_HIERARCHY: Record<Role, number> = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+
+  // Initialize from sessionStorage ONCE (safe fallback, no flashing)
+  const [user, setUser] = useState<User | null>(() => loadUser());
   const [isLoading, setIsLoading] = useState(true);
 
-  // Rehydrate user from the backend (`/api/auth/me`) on mount. This replaces
-  // the previous sessionStorage-only rehydration so the role surfaced in the
-  // UI always matches what the backend has validated from the session
-  // cookie — never a value that a malicious browser context could have
-  // tampered with.
   useEffect(() => {
     let cancelled = false;
 
-    // Fall back to sessionStorage synchronously so the UI doesn't flash while
-    // the network request is in flight; the fetched value will overwrite it.
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/me`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+        });
 
-  // Synchronous fallback from sessionStorage
-  const [user, setUser] = useState<User | null>(() => loadUser());
+        if (!res.ok) {
+          if (!cancelled) {
+            setUser(null);
+            clearUser();
+          }
+          return;
+        }
 
-  (async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/auth/me`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: { accept: 'application/json' },
-        cache: 'no-store',
-      });
+        const data = (await res.json()) as { user?: User } | User | null;
+        const fresh =
+          (data && typeof data === 'object' && 'user' in data ? data.user : (data as User | null)) ?? null;
 
-      if (!res.ok) {
         if (!cancelled) {
-          setUser(null);
-          clearUser();
+          if (fresh) {
+            setUser(fresh);
+            persistUser(fresh);
+          } else {
+            setUser(null);
+            clearUser();
+          }
         }
-        return;
+      } catch {
+        // keep cached user if any
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
+    })();
 
-      const data = (await res.json()) as { user?: User } | User | null;
-      const fresh = (data && 'user' in data ? data.user : (data as User | null)) ?? null;
-
-      if (!cancelled) {
-        if (fresh) {
-          setUser(fresh);
-          persistUser(fresh);
-        } else {
-          setUser(null);
-          clearUser();
-        }
-      }
-    } catch {
-      // keep cached user if any
-    } finally {
-      if (!cancelled) setIsLoading(false);
-    }
-  })();
-
-  return () => {
-    cancelled = true;
-  };
-}, []);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const login = useCallback(
     async (credentials: LoginCredentials) => {

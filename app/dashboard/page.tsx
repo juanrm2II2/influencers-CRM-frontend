@@ -26,9 +26,6 @@ export default function DashboardPage() {
 
   useEffect(() => { /* fetch */ }, [filters, refreshKey]);
 
-  // Try again:
-  onClick={() => setRefreshKey((k) => k + 1)}
-
   useEffect(() => {
     let cancelled = false;
 
@@ -155,6 +152,13 @@ export default function DashboardPage() {
               className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
             >
               + Add Influencer
+            </button>
+
+            <button
+              onClick={() => setRefreshKey((k) => k + 1)}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Try again
             </button>
           </div>
         ) : (

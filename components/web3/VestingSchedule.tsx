@@ -35,6 +35,15 @@ export default function VestingSchedule() {
   const { releasable, isLoading: releasableLoading } = useReleasableAmount(address);
   const { txState, claim, reset } = useClaimVestedTokens();
 
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 30_000);
+    return () => clearInterval(id);
+  }, [isConnected]);
+
   if (!isConnected) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
@@ -66,6 +75,9 @@ export default function VestingSchedule() {
   if (txState.status !== 'idle') {
     return <TransactionReceipt txState={txState} onReset={reset} />;
   }
+
+  // ...rest of the component...
+}
 
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {

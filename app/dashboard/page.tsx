@@ -20,14 +20,11 @@ export default function DashboardPage() {
 
   const fetchInfluencers = useCallback(
     async (signal?: AbortSignal) => {
-      setLoading(true);
-      setError('');
-
       try {
         // If getInfluencers doesn't accept a signal yet, update it to accept one.
         const data = await getInfluencers(filters, { signal });
         if (!signal?.aborted) setInfluencers(data);
-      } catch (e) {
+      } catch (err) {
         if (!signal?.aborted) {
           setError('Failed to load influencers. Make sure the backend is running.');
         }
@@ -40,9 +37,15 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetchInfluencers(controller.signal);
-    return () => controller.abort();
-  }, [fetchInfluencers, refreshKey]);
+
+  // Move the "sync" state updates here, not inside fetchInfluencers
+  setLoading(true);
+  setError('');
+
+  void fetchInfluencers(controller.signal);
+
+  return () => controller.abort();
+}, [fetchInfluencers, refreshKey]);
 
   // ...rest of component
   // For the error UI button, wrap it so it doesn't pass the click event:

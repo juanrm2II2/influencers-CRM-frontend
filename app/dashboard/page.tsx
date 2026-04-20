@@ -47,7 +47,6 @@ export default function DashboardPage() {
   // ...rest of component
   // For the error UI button, wrap it so it doesn't pass the click event:
   // <button onClick={() => void fetchInfluencers()}>Try again</button>
-}
 
   const filteredInfluencers = filters.search
     ? influencers.filter(

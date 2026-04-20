@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { getInfluencers } from '@/lib/api';
 import { Influencer, DashboardFilters } from '@/types';
 import InfluencerCard from '@/components/InfluencerCard';
@@ -25,7 +25,8 @@ export default function DashboardPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
 
-  const fetchInfluencers = useCallback(async () => {
+  const fetchInfluencers = useCallback(
+    async (signal?: AbortSignal) => {
     setLoading(true);
     setError('');
 

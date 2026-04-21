@@ -64,4 +64,13 @@ const mockInfluencers: Influencer[] = [
     avg_likes: 50000,
     avg_views: 200000,
     engagement_rate: 6.5,
-    profile_pic_url: 'https
+    profile_pic_url: 'https://example.com/2.jpg',
+    profile_url: 'https://tiktok.com/@user2',
+    niche: 'fashion',
+    status: 'prospect',
+    notes: '',
+    last_scraped: '2024-01-02',
+    created_at: '2024-01-02',
+  },
+];
+

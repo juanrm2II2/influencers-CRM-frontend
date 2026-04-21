@@ -1,6 +1,7 @@
 'use client';
 
-import { useAccount, useEffect, useState } from 'wagmi';
+import { useEffect, useState } from 'react';
+import { useAccount } from 'wagmi';
 import {
   useVestingSchedule,
   useReleasableAmount,

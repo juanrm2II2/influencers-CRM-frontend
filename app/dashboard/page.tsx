@@ -45,8 +45,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const controller = new AbortController();
 
-    void fetchInfluencers(controller.signal);
-
     return () => controller.abort();
   }, [fetchInfluencers, refreshKey]);
 

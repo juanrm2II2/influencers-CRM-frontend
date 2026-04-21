@@ -1,4 +1,4 @@
-'use client';
+i'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { getInfluencers } from '@/lib/api';
@@ -20,6 +20,11 @@ export default function DashboardPage() {
 
   const fetchInfluencers = useCallback(
     async (signal?: AbortSignal) => {
+      // Defer state updates out of the synchronous effect execution
+      // so they don't trigger cascading renders.
+      await Promise.resolve();
+      if (signal?.aborted) return;
+
       setLoading(true);
       setError('');
 
@@ -44,10 +49,6 @@ export default function DashboardPage() {
 
     return () => controller.abort();
   }, [fetchInfluencers, refreshKey]);
-
-  // ...rest of component
-  // For the error UI button, wrap it so it doesn't pass the click event:
-  // <button onClick={() => void fetchInfluencers()}>Try again</button>
 
   const filteredInfluencers = filters.search
     ? influencers.filter(
@@ -136,7 +137,7 @@ export default function DashboardPage() {
         ) : error ? (
           <div className="text-center py-20">
             <p className="text-red-600 mb-3">{error}</p>
-	    <button onClick={() => void fetchInfluencers()}>Try again</button>
+            <button onClick={() => setRefreshKey((k) => k + 1)}>Try again</button>
           </div>
         ) : filteredInfluencers.length === 0 ? (
           <div className="text-center py-20">

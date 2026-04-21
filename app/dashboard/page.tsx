@@ -1,5 +1,6 @@
 'use client';
 
+import React from "react";
 import { useEffect, useState, useCallback } from 'react';
 import { getInfluencers } from '@/lib/api';
 import { Influencer, DashboardFilters } from '@/types';

@@ -28,7 +28,6 @@ export default function DashboardPage() {
     async (signal?: AbortSignal) => {
       // Defer state updates out of the synchronous effect execution
       // so they don't trigger cascading renders.
-      await Promise.resolve();
       if (signal?.aborted) return;
 
       setLoading(true);
@@ -50,7 +49,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchInfluencers(controller.signal); // <-- the missing call
+    // Defer to a microtask so state updates don't happen synchronously
+    // during the effect — satisfies react-hooks/set-state-in-effect.
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) {
+        void fetchInfluencers(controller.signal);
+      }
+    });
     return () => controller.abort();
   }, [fetchInfluencers, refreshKey]);
 

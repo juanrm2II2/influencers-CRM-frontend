@@ -26,11 +26,14 @@ export default function DashboardPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Server-side filters (anything other than client-side search)
+  const { search: _search, ...restFilters } = filters;
+  const serverFiltersKey = JSON.stringify(restFilters);
+
   const serverFilters = React.useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { search, ...rest } = filters;
-    return rest;
-  }, [filters]);
+    return restFilters;
+    // Only re-create when non-search filter values actually change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverFiltersKey]);
 
   const fetchInfluencers = useCallback(
     async (signal?: AbortSignal) => {

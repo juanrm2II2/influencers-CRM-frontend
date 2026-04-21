@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DashboardPage from '../../app/dashboard/page';
 import * as api from '@/lib/api';
@@ -9,8 +9,8 @@ import type { Influencer } from '@/types';
 vi.mock('@/lib/api', () => {
   return {
     __esModule: true,
-    fetchInfluencers: vi.fn().mockResolvedValue([]),
     getInfluencers: vi.fn(),
+    fetchInfluencers: vi.fn(),
     searchInfluencer: vi.fn(),
   };
 });
@@ -86,11 +86,15 @@ const mockInfluencers: Influencer[] = [
 describe('DashboardPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // default to empty list so tests explicitly set the return value they expect
+    vi.mocked(api.getInfluencers).mockResolvedValue([]);
+    vi.mocked(api.fetchInfluencers).mockResolvedValue([]);
   });
 
   it('renders loading state initially', () => {
     // make getInfluencers never resolve
     vi.mocked(api.getInfluencers).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(api.fetchInfluencers).mockImplementation(() => new Promise(() => {}));
 
     render(<DashboardPage />);
 
@@ -99,7 +103,9 @@ describe('DashboardPage', () => {
   });
 
   it('renders influencer cards after loading', async () => {
+    // Mock both possible API functions the component might call
     vi.mocked(api.getInfluencers).mockResolvedValueOnce(mockInfluencers);
+    vi.mocked(api.fetchInfluencers).mockResolvedValueOnce(mockInfluencers);
 
     render(<DashboardPage />);
 
@@ -113,30 +119,24 @@ describe('DashboardPage', () => {
 
   it('shows stats bar with correct values', async () => {
     vi.mocked(api.getInfluencers).mockResolvedValueOnce(mockInfluencers);
+    vi.mocked(api.fetchInfluencers).mockResolvedValueOnce(mockInfluencers);
 
     render(<DashboardPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Total Influencers')).toBeInTheDocument();
-    });
-
-    // assert counts using findByText or getByText after waitFor
+    // find the stats and counts asynchronously
+    await screen.findByText('Total Influencers');
     expect(await screen.findByText('2')).toBeInTheDocument();
-    expect(await screen.findByText('1')).toBeInTheDocument();
     expect(screen.getByText('Active Partnerships')).toBeInTheDocument();
+    expect(await screen.findByText('1')).toBeInTheDocument();
   });
 
   it('shows error state on API failure', async () => {
     vi.mocked(api.getInfluencers).mockRejectedValueOnce(new Error('Network error'));
+    vi.mocked(api.fetchInfluencers).mockRejectedValueOnce(new Error('Network error'));
 
     render(<DashboardPage />);
 
-    await waitFor(() => {
-      expect(
-        screen.getByText('Failed to load influencers. Make sure the backend is running.'),
-      ).toBeInTheDocument();
-    });
-
+    await screen.findByText('Failed to load influencers. Make sure the backend is running.');
     expect(screen.getByText('Try again')).toBeInTheDocument();
   });
 
@@ -144,14 +144,15 @@ describe('DashboardPage', () => {
     vi.mocked(api.getInfluencers)
       .mockRejectedValueOnce(new Error('err'))
       .mockResolvedValueOnce(mockInfluencers);
+    vi.mocked(api.fetchInfluencers)
+      .mockRejectedValueOnce(new Error('err'))
+      .mockResolvedValueOnce(mockInfluencers);
 
     const user = userEvent.setup();
     render(<DashboardPage />);
 
     // Wait for error UI
-    await waitFor(() => {
-      expect(screen.getByText('Try again')).toBeInTheDocument();
-    });
+    await screen.findByText('Try again');
 
     await user.click(screen.getByText('Try again'));
 
@@ -162,6 +163,7 @@ describe('DashboardPage', () => {
 
   it('shows empty state when no influencers', async () => {
     vi.mocked(api.getInfluencers).mockResolvedValueOnce([]);
+    vi.mocked(api.fetchInfluencers).mockResolvedValueOnce([]);
 
     render(<DashboardPage />);
 
@@ -171,6 +173,7 @@ describe('DashboardPage', () => {
 
   it('opens Add Influencer modal', async () => {
     vi.mocked(api.getInfluencers).mockResolvedValueOnce([]);
+    vi.mocked(api.fetchInfluencers).mockResolvedValueOnce([]);
     const user = userEvent.setup();
 
     render(<DashboardPage />);
@@ -187,6 +190,7 @@ describe('DashboardPage', () => {
 
   it('filters influencers by search text', async () => {
     vi.mocked(api.getInfluencers).mockResolvedValueOnce(mockInfluencers);
+    vi.mocked(api.fetchInfluencers).mockResolvedValueOnce(mockInfluencers);
     const user = userEvent.setup();
 
     render(<DashboardPage />);
@@ -198,14 +202,14 @@ describe('DashboardPage', () => {
     const searchInput = screen.getByPlaceholderText('Search name or handle...');
     await user.type(searchInput, 'User One');
 
-    await waitFor(() => {
-      expect(screen.getByText('User One')).toBeInTheDocument();
-      expect(screen.queryByText('User Two')).not.toBeInTheDocument();
-    });
+    // After typing, ensure the list is filtered
+    await screen.findByText('User One');
+    expect(screen.queryByText('User Two')).not.toBeInTheDocument();
   });
 
   it('header shows Influencer CRM title', async () => {
     vi.mocked(api.getInfluencers).mockResolvedValueOnce([]);
+    vi.mocked(api.fetchInfluencers).mockResolvedValueOnce([]);
 
     render(<DashboardPage />);
 

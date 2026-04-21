@@ -100,9 +100,8 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText('User One')).toBeInTheDocument();
-      expect(screen.getByText('User Two')).toBeInTheDocument();
+    expect(screen.getByText('User One')).toBeInTheDocument();
+    expect(screen.getByText('User Two')).toBeInTheDocument();
     });
   });
 

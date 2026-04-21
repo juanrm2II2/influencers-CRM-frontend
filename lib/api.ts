@@ -45,13 +45,19 @@ api.interceptors.response.use(
   }
 );
 
-export async function getInfluencers(filters?: DashboardFilters): Promise<Influencer[]> {
+export async function getInfluencers(
+  filters?: DashboardFilters,
+  options?: { signal?: AbortSignal }
+): Promise<Influencer[]> {
   const params: Record<string, string> = {};
   if (filters?.platform) params.platform = filters.platform;
   if (filters?.status) params.status = filters.status;
   if (filters?.niche) params.niche = filters.niche;
   if (filters?.min_followers) params.min_followers = filters.min_followers;
-  const { data } = await api.get<Influencer[]>('/api/influencers', { params });
+  const { data } = await api.get<Influencer[]>('/api/influencers', {
+    params,
+    signal: options?.signal,
+  });
   return data;
 }
 

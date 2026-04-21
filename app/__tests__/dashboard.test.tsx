@@ -9,20 +9,7 @@ import type { Influencer } from '@/types';
 vi.mock('@/lib/api', () => {
   return {
     __esModule: true,
-    fetchInfluencers: vi.fn().mockResolvedValue([
-      {
-        id: '1',
-        handle: 'user1',
-        platform: 'instagram',
-        full_name: 'User One',
-      },
-      {
-        id: '2',
-        handle: 'user2',
-        platform: 'tiktok',
-        full_name: 'User Two',
-      },
-    ]),
+    fetchInfluencers: vi.fn().mockResolvedValue([]),
     getInfluencers: vi.fn(),
     searchInfluencer: vi.fn(),
   };
@@ -116,10 +103,12 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText('User One')).toBeInTheDocument();
-      expect(screen.getByText('User Two')).toBeInTheDocument();
-    });
+    // use findByText which waits for the element to appear
+    await screen.findByText('User One');
+    await screen.findByText('User Two');
+
+    expect(screen.getByText('User One')).toBeInTheDocument();
+    expect(screen.getByText('User Two')).toBeInTheDocument();
   });
 
   it('shows stats bar with correct values', async () => {
@@ -129,12 +118,12 @@ describe('DashboardPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Total Influencers')).toBeInTheDocument();
-      // total count
-      expect(screen.getByText('2')).toBeInTheDocument();
-      expect(screen.getByText('Active Partnerships')).toBeInTheDocument();
-      // one active in mockInfluencers
-      expect(screen.getByText('1')).toBeInTheDocument();
     });
+
+    // assert counts using findByText or getByText after waitFor
+    expect(await screen.findByText('2')).toBeInTheDocument();
+    expect(await screen.findByText('1')).toBeInTheDocument();
+    expect(screen.getByText('Active Partnerships')).toBeInTheDocument();
   });
 
   it('shows error state on API failure', async () => {
@@ -167,9 +156,8 @@ describe('DashboardPage', () => {
     await user.click(screen.getByText('Try again'));
 
     // After retry, influencer cards should appear
-    await waitFor(() => {
-      expect(screen.getByText('User One')).toBeInTheDocument();
-    });
+    await screen.findByText('User One');
+    expect(screen.getByText('User One')).toBeInTheDocument();
   });
 
   it('shows empty state when no influencers', async () => {
@@ -177,9 +165,8 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText('No influencers found')).toBeInTheDocument();
-    });
+    await screen.findByText('No influencers found');
+    expect(screen.getByText('No influencers found')).toBeInTheDocument();
   });
 
   it('opens Add Influencer modal', async () => {
@@ -188,17 +175,14 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText('No influencers found')).toBeInTheDocument();
-    });
+    await screen.findByText('No influencers found');
 
     // Click the header button (use getAllByText if there are multiple)
     const addButtons = screen.getAllByText('+ Add Influencer');
     await user.click(addButtons[0]);
 
-    await waitFor(() => {
-      expect(screen.getByText('Handle')).toBeInTheDocument();
-    });
+    await screen.findByText('Handle');
+    expect(screen.getByText('Handle')).toBeInTheDocument();
   });
 
   it('filters influencers by search text', async () => {
@@ -207,11 +191,9 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    // Wait for initial list
-    await waitFor(() => {
-      expect(screen.getByText('User One')).toBeInTheDocument();
-      expect(screen.getByText('User Two')).toBeInTheDocument();
-    });
+    // Wait for initial list using findByText
+    await screen.findByText('User One');
+    await screen.findByText('User Two');
 
     const searchInput = screen.getByPlaceholderText('Search name or handle...');
     await user.type(searchInput, 'User One');
@@ -227,9 +209,9 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    // header should be present immediately or after initial render
     const heading = await screen.findByRole('heading', { level: 1, name: 'Influencer CRM' });
     expect(heading).toBeInTheDocument();
     expect(screen.getByText('Manage your influencer partnerships')).toBeInTheDocument();
   });
 });
+

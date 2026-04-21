@@ -10,6 +10,12 @@ import AddInfluencerModal from '@/components/AddInfluencerModal';
 import UserMenu from '@/components/UserMenu';
 import Footer from '@/components/Footer';
 
+function formatNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
 export default function DashboardPage() {
   const [influencers, setInfluencers] = useState<Influencer[]>([]);
   const [filters, setFilters] = useState<DashboardFilters>({});
@@ -44,7 +50,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-
+    fetchInfluencers(controller.signal); // <-- the missing call
     return () => controller.abort();
   }, [fetchInfluencers, refreshKey]);
 

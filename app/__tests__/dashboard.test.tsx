@@ -9,7 +9,7 @@ vi.mock('@/lib/api', () => ({
   fetchInfluencers: () => Promise.resolve([
     { id: 1, name: "User One" },
     { id: 2, name: "User Two" }
-  ])
+  ]),
   getInfluencers: vi.fn(),
   searchInfluencer: vi.fn(),
 }));

@@ -102,7 +102,6 @@ describe('DashboardPage', () => {
 
     expect(screen.getByText('User One')).toBeInTheDocument();
     expect(screen.getByText('User Two')).toBeInTheDocument();
-    });
   });
 
   it('shows stats bar with correct values', async () => {

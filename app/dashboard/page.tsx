@@ -1,4 +1,4 @@
-i'use client';
+'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { getInfluencers } from '@/lib/api';

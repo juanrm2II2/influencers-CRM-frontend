@@ -24,6 +24,13 @@ export default function DashboardPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Server-side filters (anything other than client-side search)
+  const serverFilters = React.useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { search, ...rest } = filters;
+    return rest;
+  }, [filters]);
+
   const fetchInfluencers = useCallback(
     async (signal?: AbortSignal) => {
       // Defer state updates out of the synchronous effect execution

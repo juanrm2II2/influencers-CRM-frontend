@@ -34,15 +34,14 @@ export default function DashboardPage() {
 
   const fetchInfluencers = useCallback(
     async (signal?: AbortSignal) => {
-      // Defer state updates out of the synchronous effect execution
-      // so they don't trigger cascading renders.
       if (signal?.aborted) return;
 
       setLoading(true);
       setError('');
 
       try {
-        const data = await getInfluencers(filters, { signal });
+        // Use serverFilters so typing in the search box doesn't trigger a refetch
+        const data = await getInfluencers(serverFilters, { signal });
         if (!signal?.aborted) setInfluencers(data);
       } catch {
         if (!signal?.aborted) {
@@ -52,7 +51,7 @@ export default function DashboardPage() {
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [filters]
+    [serverFilters]
   );
 
   useEffect(() => {

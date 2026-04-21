@@ -20,19 +20,17 @@ export default function DashboardPage() {
 
   const fetchInfluencers = useCallback(
     async (signal?: AbortSignal) => {
-      // mark request start here
       setLoading(true);
       setError('');
 
       try {
-        // If getInfluencers doesn't accept a signal yet, update it to accept one.
         const data = await getInfluencers(filters, { signal });
         if (!signal?.aborted) setInfluencers(data);
       } catch {
         if (!signal?.aborted) {
           setError('Failed to load influencers. Make sure the backend is running.');
         }
-      }
+      } finally {
         if (!signal?.aborted) setLoading(false);
       }
     },

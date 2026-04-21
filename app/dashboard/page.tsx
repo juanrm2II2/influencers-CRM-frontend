@@ -42,10 +42,14 @@ export default function DashboardPage() {
   useEffect(() => {
     const controller = new AbortController();
 
-  void fetchInfluencers(controller.signal);
+    // Start request state changes here (not inside the effect-called function)
+    setLoading(true);
+    setError('');
 
-  return () => controller.abort();
-}, [fetchInfluencers, refreshKey]);
+    void fetchInfluencers(controller.signal);
+
+    return () => controller.abort();
+  }, [fetchInfluencers, refreshKey]);
 
   // ...rest of component
   // For the error UI button, wrap it so it doesn't pass the click event:

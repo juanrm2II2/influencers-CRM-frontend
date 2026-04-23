@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Server-side filters (anything other than client-side search)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { search: _search, ...restFilters } = filters;
   const serverFiltersKey = JSON.stringify(restFilters);
 

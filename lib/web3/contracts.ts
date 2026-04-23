@@ -144,9 +144,7 @@ export const VESTING_ABI = [
 function envAddress(key: string): `0x${string}` {
   const raw = process.env[key] ?? '';
   if (/^0x[0-9a-fA-F]{40}$/.test(raw)) return raw as `0x${string}`;
-  // Return zero-address as fallback so the app renders without deployed
-  // contracts (useful during development / CI).
-  return '0x0000000000000000000000000000000000000000';
+  throw new Error(`${key} must be a valid contract address. Current value: "${raw}"`);
 }
 
 export const CONTRACT_ADDRESSES = {

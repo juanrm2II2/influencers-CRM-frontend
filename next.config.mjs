@@ -23,10 +23,10 @@ const nextConfig = {
     // YouTube, Twitter) whose hostnames are dynamic and cannot be pre-enumerated.
     // Restrict to HTTPS only to mitigate mixed-content and cleartext risks.
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
+      { protocol: 'https', hostname: '*.cdninstagram.com' },
+      { protocol: 'https', hostname: '*.twimg.com' },
+      { protocol: 'https', hostname: 'yt3.ggpht.com' },
+      { protocol: 'https', hostname: '*.tiktokcdn.com' },
     ],
   },
 

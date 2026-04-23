@@ -38,7 +38,7 @@ export function buildCspHeaderValue(): string {
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self'",
-    "img-src 'self' https: data:",
+    "img-src 'self' data: https://*.cdninstagram.com https://*.twimg.com https://yt3.ggpht.com https://p16-sign.tiktokcdn.com",
     `connect-src 'self' ${apiUrl} ${web3ConnectSrc} ${kycConnectSrc}`,
     `frame-src 'self' ${kycFrameSrc}`,
     "frame-ancestors 'none'",

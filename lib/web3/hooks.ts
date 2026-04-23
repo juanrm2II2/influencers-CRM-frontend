@@ -11,6 +11,25 @@ import { performSiwe } from './siwe';
 
 // ─── Shared helper: derive final tx state from write-state + receipt ─────────
 
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
+/**
+ * Throws if a contract address is the zero address, which indicates the
+ * corresponding `NEXT_PUBLIC_*_ADDRESS` env var was not supplied. Without
+ * this guard a user's wallet could be prompted to send ETH to `0x0…0`,
+ * which would be unrecoverable.
+ *
+ * @internal Exported for unit tests only.
+ */
+export function assertContractConfigured(address: `0x${string}`, label: string): void {
+  if (address.toLowerCase() === ZERO_ADDRESS) {
+    throw new Error(
+      `${label} contract address is not configured. ` +
+        `Set the corresponding NEXT_PUBLIC_*_ADDRESS environment variable to the deployed contract address.`,
+    );
+  }
+}
+
 type WriteState = {
   status: 'idle' | 'pending' | 'confirming' | 'failed';
   hash?: `0x${string}`;
@@ -178,6 +197,7 @@ export function useContribute() {
     async (amountEth: string) => {
       try {
         setWriteState({ status: 'pending' });
+        assertContractConfigured(CONTRACT_ADDRESSES.tokenSale, 'Token sale');
         await ensureCorrectChain();
         const value = parseEther(amountEth);
         const hash = await writeContractAsync({
@@ -259,6 +279,7 @@ export function useClaimVestedTokens() {
   const claim = useCallback(async () => {
     try {
       setWriteState({ status: 'pending' });
+      assertContractConfigured(CONTRACT_ADDRESSES.vesting, 'Vesting');
       await ensureCorrectChain();
       const hash = await writeContractAsync({
         address: CONTRACT_ADDRESSES.vesting,
@@ -295,6 +316,7 @@ export function useWhitelistManagement() {
     async (accounts: `0x${string}`[], maxContributions: bigint[]) => {
       try {
         setWriteState({ status: 'pending' });
+        assertContractConfigured(CONTRACT_ADDRESSES.tokenSale, 'Token sale');
         await ensureCorrectChain();
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.tokenSale,
@@ -315,6 +337,7 @@ export function useWhitelistManagement() {
     async (accounts: `0x${string}`[]) => {
       try {
         setWriteState({ status: 'pending' });
+        assertContractConfigured(CONTRACT_ADDRESSES.tokenSale, 'Token sale');
         await ensureCorrectChain();
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.tokenSale,

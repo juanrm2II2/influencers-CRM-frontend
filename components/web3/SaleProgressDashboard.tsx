@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 
 function ProgressBar({ value, max, label }: { value: bigint; max: bigint; label: string }) {
   const pct = max > 0n ? Number((value * 10000n) / max) / 100 : 0;
+  const clamped = Math.min(Math.max(pct, 0), 100);
   return (
     <div>
       <div className="flex justify-between text-sm mb-1">
@@ -14,9 +15,9 @@ function ProgressBar({ value, max, label }: { value: bigint; max: bigint; label:
       <div className="h-3 rounded-full bg-gray-200 overflow-hidden">
         <div
           className="h-full rounded-full bg-blue-600 transition-all duration-700"
-          style={{ width: `${Math.min(pct, 100)}%` }}
+          style={{ width: `${clamped}%` }}
           role="progressbar"
-          aria-valuenow={pct}
+          aria-valuenow={clamped}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label={label}

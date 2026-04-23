@@ -4,7 +4,7 @@ vi.mock('@rainbow-me/rainbowkit', () => ({
   getDefaultConfig: () => ({}),
 }));
 
-import { formatWei, formatTokenAmount, ChainMismatchError } from '../hooks';
+import { formatWei, formatTokenAmount, ChainMismatchError, assertContractConfigured } from '../hooks';
 
 describe('ChainMismatchError', () => {
   it('reports expected and actual chain IDs', () => {
@@ -70,5 +70,28 @@ describe('formatTokenAmount', () => {
 
   it('formats large amounts', () => {
     expect(formatTokenAmount(1000000000000000000000000n)).toBe('1000000.0000');
+  });
+});
+
+describe('assertContractConfigured', () => {
+  it('throws when address is the zero address', () => {
+    expect(() =>
+      assertContractConfigured('0x0000000000000000000000000000000000000000', 'Token sale'),
+    ).toThrow(/Token sale contract address is not configured/);
+  });
+
+  it('throws when address is the zero address in mixed case', () => {
+    expect(() =>
+      assertContractConfigured(
+        '0x0000000000000000000000000000000000000000'.toUpperCase().replace('0X', '0x') as `0x${string}`,
+        'Vesting',
+      ),
+    ).toThrow(/Vesting contract address is not configured/);
+  });
+
+  it('does not throw for a real address', () => {
+    expect(() =>
+      assertContractConfigured('0x1234567890123456789012345678901234567890', 'Token sale'),
+    ).not.toThrow();
   });
 });

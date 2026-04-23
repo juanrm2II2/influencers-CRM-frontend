@@ -1,9 +1,10 @@
-// components/web3/ContributionForm.tsx
+'use client';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { useContribute, useKycVerification } from '@/lib/web3/hooks';
 
-export default function ContributionForm(): JSX.Element {
+export default function ContributionForm() {
   const { address, isConnected } = useAccount();
   const { isVerified, verification, isLoading: kycLoading, fetchStatus } =
     useKycVerification(address);

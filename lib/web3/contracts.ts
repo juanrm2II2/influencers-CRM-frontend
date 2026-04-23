@@ -148,9 +148,15 @@ function envAddress(key: string): `0x${string}` {
   if (/^0x[0-9a-fA-F]{40}$/.test(raw)) return raw as `0x${string}`;
   // In production the build pipeline is expected to supply these; in tests
   // and local dev we fall back to the zero address so module import does not
-  // throw. Contract write hooks guard against zero-address before sending txs.
-  if (raw !== '' && process.env.NODE_ENV !== 'test') {
-    console.warn(`[web3] ${key} is not a valid 0x-prefixed address: "${raw}"; falling back to zero address.`);
+  // throw. Contract write hooks (see lib/web3/hooks.ts `assertContractConfigured`)
+  // guard against the zero address before sending txs so users cannot
+  // accidentally send funds to 0x0 when a deployment is misconfigured.
+  if (process.env.NODE_ENV !== 'test') {
+    if (raw === '') {
+      console.warn(`[web3] ${key} is not set; falling back to zero address. Contract writes will be blocked.`);
+    } else {
+      console.warn(`[web3] ${key} is not a valid 0x-prefixed address: "${raw}"; falling back to zero address.`);
+    }
   }
   return ZERO_ADDRESS;
 }

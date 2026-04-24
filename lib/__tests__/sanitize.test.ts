@@ -80,6 +80,18 @@ describe('sanitizeText (SSR fallback)', () => {
     expect(sanitizeText('<style>body{}</style>visible')).toBe('visible');
     expect(sanitizeText('<!-- comment -->kept')).toBe('kept');
 
+    // Adversarial: nested constructs that defeat single-pass regex
+    // strippers. The state-machine implementation is idempotent.
+    // `<<script>...>` — the first `<` is a stray (next char is `<`, not
+    // a letter or `/`) so it is preserved as a literal byte; the inner
+    // `<script>...</script>` is then stripped, leaving `<>`.
+    expect(sanitizeText('<<script>alert(1)</script>>')).toBe('<>');
+    expect(sanitizeText('<scr<script>ipt>alert(1)</script>')).toBe('ipt>alert(1)');
+    expect(sanitizeText('<SCRIPT>x</SCRIPT>kept')).toBe('kept');
+    expect(sanitizeText('<script\nfoo>x</script\t>kept')).toBe('kept');
+    expect(sanitizeText('a < b')).toBe('a < b'); // stray `<` preserved
+    expect(sanitizeText('unterminated <b')).toBe('unterminated ');
+
     // Restore
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (globalThis as any).window = saved;

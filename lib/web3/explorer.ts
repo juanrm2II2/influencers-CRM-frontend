@@ -28,15 +28,18 @@ const CHAIN_EXPLORERS: Record<number, string> = {
 /**
  * Resolve the default chain ID. Mirrors the validation done in
  * `lib/web3/config.ts` but inlined so this module has zero wagmi
- * runtime dependencies. Unknown / malformed values fall back to
- * mainnet rather than producing a surprise binding.
+ * runtime dependencies. Malformed values fall back to mainnet, but a
+ * well-formed integer that simply doesn't have an explorer entry is
+ * preserved as-is so {@link explorerTxUrl} returns `null` and the UI
+ * hides the link instead of pointing the user at the wrong network's
+ * explorer.
  */
 function resolveDefaultChainId(): number {
   const raw = process.env.NEXT_PUBLIC_EXPECTED_CHAIN_ID;
   if (!raw) return mainnet.id;
   const parsed = parseInt(raw, 10);
   if (!Number.isInteger(parsed) || parsed <= 0) return mainnet.id;
-  return CHAIN_EXPLORERS[parsed] ? parsed : mainnet.id;
+  return parsed;
 }
 
 const DEFAULT_CHAIN_ID = resolveDefaultChainId();

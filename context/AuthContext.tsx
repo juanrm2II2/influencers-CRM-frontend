@@ -209,7 +209,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         channel = new BroadcastChannel(ROLE_REVOCATION_CHANNEL);
         channel.addEventListener('message', handleRevocation);
-      } catch {
+      } catch (err) {
+        // Cross-tab role revocation is a security feature (audit H-01).
+        // Log so operators / Sentry can detect when it is silently
+        // unavailable; the storage-event fallback below still fires.
+        console.warn('[auth] BroadcastChannel unavailable; falling back to storage events.', err);
         channel = null;
       }
     }

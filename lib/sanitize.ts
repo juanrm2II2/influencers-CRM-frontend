@@ -1,32 +1,136 @@
 import DOMPurify from 'dompurify';
 
 /**
- * Minimal, dependency-free strip-tags fallback used when no DOM is
- * available (Server Components / Edge runtime / SSR). The output is the
- * textual content of the input with all tags, attributes, comments and
- * processing instructions removed so callers can never accidentally feed
- * unsanitized HTML into a non-JSX sink (CSV export, Content-Disposition,
- * `dangerouslySetInnerHTML` in a server component, etc.).
+ * Strip every HTML tag — including <script>/<style> blocks and the
+ * textual content nested inside them — from a string. Used as the
+ * SSR-side fallback for {@link sanitizeText} when no DOM is available
+ * (Server Components / Edge runtime).
  *
- * This intentionally does NOT decode HTML entities: the input is treated
- * as text-with-markup, the markup is stripped, and the surviving text is
- * returned as-is so legitimate `&` / `<` characters round-trip when used
- * downstream as plain text.
+ * Implemented as a single-pass character-by-character state machine
+ * rather than a chain of regex replacements. This is deliberate:
+ * regex-based strip-tags routinely fail on adversarial nested
+ * constructs (e.g. `<<script>script>`, `<scr<script>ipt>`), and
+ * CodeQL's `js/incomplete-multi-character-sanitization` /
+ * `js/bad-tag-filter` rules flag exactly that anti-pattern. A linear
+ * scan that tracks "are we inside a tag/script/style/comment?" is
+ * idempotent by construction.
  */
 function stripTagsServer(input: string): string {
-  return input
-    // Remove HTML/XML comments (including conditional comments).
-    .replace(/<!--[\s\S]*?-->/g, '')
-    // Remove CDATA / processing instructions / doctype.
-    .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')
-    .replace(/<\?[\s\S]*?\?>/g, '')
-    .replace(/<![A-Za-z][\s\S]*?>/g, '')
-    // Remove <script>…</script> and <style>…</style> blocks entirely so
-    // their textual contents do not leak into the output.
-    .replace(/<script\b[\s\S]*?<\/script\s*>/gi, '')
-    .replace(/<style\b[\s\S]*?<\/style\s*>/gi, '')
-    // Strip any remaining tag (open, close, or self-closing).
-    .replace(/<\/?[A-Za-z][^>]*>/g, '');
+  let out = '';
+  let i = 0;
+  const len = input.length;
+
+  while (i < len) {
+    const ch = input[i];
+    if (ch !== '<') {
+      out += ch;
+      i++;
+      continue;
+    }
+
+    // Comment <!-- … -->
+    if (input.startsWith('<!--', i)) {
+      const end = input.indexOf('-->', i + 4);
+      i = end === -1 ? len : end + 3;
+      continue;
+    }
+    // CDATA <![CDATA[ … ]]>
+    if (input.startsWith('<![CDATA[', i)) {
+      const end = input.indexOf(']]>', i + 9);
+      i = end === -1 ? len : end + 3;
+      continue;
+    }
+    // Doctype / declaration <!FOO …>
+    if (input[i + 1] === '!') {
+      const end = input.indexOf('>', i + 2);
+      i = end === -1 ? len : end + 1;
+      continue;
+    }
+    // Processing instruction <? … ?>
+    if (input[i + 1] === '?') {
+      const end = input.indexOf('?>', i + 2);
+      i = end === -1 ? len : end + 2;
+      continue;
+    }
+    // <script …> … </script>  (drop both tags AND inner content).
+    // Match by lower-casing only the literal byte we look at — no full
+    // string alloc — and verify the next character is a tag terminator
+    // (whitespace / `>` / `/`) so we do not match e.g. `<scripts>`.
+    if (matchesTagOpen(input, i, 'script')) {
+      i = skipUntilClosing(input, i, 'script');
+      continue;
+    }
+    if (matchesTagOpen(input, i, 'style')) {
+      i = skipUntilClosing(input, i, 'style');
+      continue;
+    }
+    // Generic tag (open / close / self-closing). A `<` that is NOT
+    // followed by a letter or `/` is treated as a literal byte —
+    // matches HTML5 parser behaviour for stray `<`.
+    const next = input[i + 1];
+    if (next && (isAsciiLetter(next) || next === '/')) {
+      const end = input.indexOf('>', i + 1);
+      i = end === -1 ? len : end + 1;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+function isAsciiLetter(c: string): boolean {
+  const code = c.charCodeAt(0);
+  return (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a);
+}
+
+/** Returns true when `input[i..]` starts with `<{tag}` followed by a
+ *  tag-name terminator (`>`, `/`, whitespace). Case-insensitive. */
+function matchesTagOpen(input: string, i: number, tag: string): boolean {
+  if (input[i] !== '<') return false;
+  const tagLen = tag.length;
+  if (i + 1 + tagLen > input.length) return false;
+  for (let k = 0; k < tagLen; k++) {
+    const c = input.charCodeAt(i + 1 + k);
+    const expected = tag.charCodeAt(k);
+    // Compare lower-cased ASCII letters.
+    if ((c | 0x20) !== expected) return false;
+  }
+  const after = input[i + 1 + tagLen];
+  if (after === undefined) return false;
+  return after === '>' || after === '/' || /\s/.test(after);
+}
+
+/** Skip from a `<{tag}…>` opener through its matching `</{tag}>`
+ *  closer (or to EOF if unterminated). Case-insensitive. */
+function skipUntilClosing(input: string, i: number, tag: string): number {
+  // First, advance past the opening tag's `>`.
+  const tagOpenEnd = input.indexOf('>', i);
+  if (tagOpenEnd === -1) return input.length;
+  let j = tagOpenEnd + 1;
+  const closer = `</${tag}`;
+  // Case-insensitive search for the closer.
+  while (j < input.length) {
+    const candidate = input.indexOf('<', j);
+    if (candidate === -1) return input.length;
+    if (matchesCloserAt(input, candidate, closer)) {
+      const end = input.indexOf('>', candidate);
+      return end === -1 ? input.length : end + 1;
+    }
+    j = candidate + 1;
+  }
+  return input.length;
+}
+
+function matchesCloserAt(input: string, i: number, closer: string): boolean {
+  if (i + closer.length > input.length) return false;
+  for (let k = 0; k < closer.length; k++) {
+    const c = input.charCodeAt(i + k);
+    const expected = closer.charCodeAt(k);
+    if ((c | 0x20) !== (expected | 0x20)) return false;
+  }
+  const after = input[i + closer.length];
+  return after === undefined || after === '>' || after === '/' || /\s/.test(after);
 }
 
 /**

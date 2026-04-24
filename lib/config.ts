@@ -56,8 +56,10 @@ function resolveApiUrl(): string {
     );
   }
 
-  // Strip any trailing slash so callers can safely do `${API_URL}/api/...`.
-  return raw.replace(/\/+$/, '');
+  // Re-serialize from the parsed URL so any trailing-slash stripping
+  // operates on the canonical pathname only and cannot accidentally
+  // touch the query string or fragment.
+  return parsed.href.replace(/\/+$/, '');
 }
 
 /** Base URL of the backend API (Express). */

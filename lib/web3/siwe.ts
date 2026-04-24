@@ -127,9 +127,10 @@ export async function verifySiwe(args: {
 export async function performSiwe(args: {
   address: `0x${string}`;
   /**
-   * @deprecated The SIWE chainId is always `EXPECTED_CHAIN_ID`; this field
-   * is accepted for backwards compatibility but is ignored and must equal
-   * `EXPECTED_CHAIN_ID` when provided.
+   * @deprecated The SIWE chainId is always `EXPECTED_CHAIN_ID`; when a
+   * value is supplied it is validated (not silently accepted) and must
+   * equal `EXPECTED_CHAIN_ID`, otherwise the call throws. Prefer omitting
+   * this field entirely in new code.
    */
   chainId?: number;
   signMessage: SiweSignFn;

@@ -103,8 +103,12 @@ export async function middleware(request: NextRequest) {
     // without this check, visiting e.g. `//evil.com` would produce
     // `/login?redirect=//evil.com`, which a naive login-page handler
     // could then use for `router.push(redirect)`.
-    if (isSafeRedirectTarget(pathname)) {
-      loginUrl.searchParams.set('redirect', pathname);
+    //
+    // We validate *and* forward the already-normalized path so that
+    // case / encoding / duplicate-slash variants cannot re-introduce
+    // bypass primitives on the consumer side.
+    if (isSafeRedirectTarget(normalizedPath)) {
+      loginUrl.searchParams.set('redirect', normalizedPath);
     }
     const response = NextResponse.redirect(loginUrl);
     applySecurityHeaders(response);

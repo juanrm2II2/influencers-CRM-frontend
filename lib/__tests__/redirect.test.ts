@@ -29,6 +29,18 @@ describe('isSafeRedirectTarget', () => {
     expect(isSafeRedirectTarget('/foo bar')).toBe(false);
   });
 
+  it('rejects paths containing path-traversal segments (..)', () => {
+    expect(isSafeRedirectTarget('/..')).toBe(false);
+    expect(isSafeRedirectTarget('/foo/..')).toBe(false);
+    expect(isSafeRedirectTarget('/foo/../bar')).toBe(false);
+    expect(isSafeRedirectTarget('/../etc/passwd')).toBe(false);
+    expect(isSafeRedirectTarget('/.')).toBe(false);
+    expect(isSafeRedirectTarget('/foo/./bar')).toBe(false);
+    // Legitimate names that merely *contain* dots are preserved.
+    expect(isSafeRedirectTarget('/..foo')).toBe(true);
+    expect(isSafeRedirectTarget('/foo..bar')).toBe(true);
+  });
+
   it('rejects empty, too-long, and non-string values', () => {
     expect(isSafeRedirectTarget('')).toBe(false);
     expect(isSafeRedirectTarget('/' + 'a'.repeat(600))).toBe(false);

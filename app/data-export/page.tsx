@@ -1,43 +1,51 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { getInfluencers } from '@/lib/api';
+import { getInfluencers, logDataExportEvent } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
+import { buildCsv } from '@/lib/export';
 import type { Influencer } from '@/types';
 import Footer from '@/components/Footer';
 
 type ExportFormat = 'csv' | 'json';
 
-function influencerToCsvRow(inf: Influencer): string {
-  const escape = (val: string | number | undefined): string => {
-    const str = String(val ?? '');
-    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  };
+const CSV_HEADER = [
+  'id',
+  'handle',
+  'platform',
+  'full_name',
+  'bio',
+  'followers',
+  'following',
+  'avg_likes',
+  'avg_views',
+  'engagement_rate',
+  'profile_url',
+  'niche',
+  'status',
+  'notes',
+  'created_at',
+] as const;
 
+function influencerToCsvRow(inf: Influencer): ReadonlyArray<string | number | undefined> {
   return [
-    escape(inf.id),
-    escape(inf.handle),
-    escape(inf.platform),
-    escape(inf.full_name),
-    escape(inf.bio),
-    escape(inf.followers),
-    escape(inf.following),
-    escape(inf.avg_likes),
-    escape(inf.avg_views),
-    escape(inf.engagement_rate),
-    escape(inf.profile_url),
-    escape(inf.niche),
-    escape(inf.status),
-    escape(inf.notes),
-    escape(inf.created_at),
-  ].join(',');
+    inf.id,
+    inf.handle,
+    inf.platform,
+    inf.full_name,
+    inf.bio,
+    inf.followers,
+    inf.following,
+    inf.avg_likes,
+    inf.avg_views,
+    inf.engagement_rate,
+    inf.profile_url,
+    inf.niche,
+    inf.status,
+    inf.notes,
+    inf.created_at,
+  ];
 }
-
-const CSV_HEADER =
-  'id,handle,platform,full_name,bio,followers,following,avg_likes,avg_views,engagement_rate,profile_url,niche,status,notes,created_at';
 
 function downloadBlob(content: string, filename: string, mimeType: string): void {
   const blob = new Blob([content], { type: mimeType });
@@ -63,21 +71,42 @@ export default function DataExportPage() {
       setSuccess('');
       setExporting(true);
 
+      let rowCount = 0;
       try {
         const influencers = await getInfluencers();
+        rowCount = influencers.length;
         const timestamp = new Date().toISOString().split('T')[0];
 
         if (format === 'json') {
           const data = JSON.stringify(influencers, null, 2);
           downloadBlob(data, `influencer-data-${timestamp}.json`, 'application/json');
         } else {
-          const rows = [CSV_HEADER, ...influencers.map(influencerToCsvRow)];
-          downloadBlob(rows.join('\n'), `influencer-data-${timestamp}.csv`, 'text/csv');
+          // CSV fields are run through `buildCsv` which neutralizes
+          // formula-injection leaders (= + - @ \t \r) and quotes every
+          // field unconditionally — see lib/export.ts (audit M-06).
+          const csv = buildCsv(CSV_HEADER, influencers.map(influencerToCsvRow));
+          downloadBlob(csv, `influencer-data-${timestamp}.csv`, 'text/csv');
         }
 
         setSuccess(`Data exported successfully as ${format.toUpperCase()}.`);
-      } catch {
+
+        // GDPR Art. 15 / 30: notify the backend that the export
+        // succeeded so an immutable audit trail can be persisted.
+        // Best-effort — failure here must NOT block the user receiving
+        // their data (audit M-04).
+        void logDataExportEvent({
+          format,
+          rowCount,
+          success: true,
+        });
+      } catch (err) {
         setError('Failed to export data. Please try again.');
+        void logDataExportEvent({
+          format,
+          rowCount,
+          success: false,
+          errorMessage: err instanceof Error ? err.message : 'Unknown error',
+        });
       } finally {
         setExporting(false);
       }

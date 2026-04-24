@@ -37,6 +37,16 @@ export function isSafeRedirectTarget(path: unknown): path is string {
   // backslash anywhere in the path — these are classic open-redirect
   // bypass vectors in browser URL parsers.
   if (/[\x00-\x1f\x7f\s\\]/.test(path)) return false;
+  // Explicitly reject path-traversal segments. Browser URL parsing and
+  // Next.js router both normalize `..` segments today, but rejecting
+  // them up-front is clearer intent and defends against a future router
+  // change that could expose internal routes via `/foo/..` traversal.
+  // We split on `/` and look for any segment that is exactly `..` so a
+  // legitimate name like `/..foo` is preserved.
+  const segments = path.split('/');
+  for (const segment of segments) {
+    if (segment === '..' || segment === '.') return false;
+  }
   return true;
 }
 

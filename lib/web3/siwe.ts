@@ -25,21 +25,95 @@ export interface SiweSignFn {
 }
 
 /** Fetch a fresh, server-generated SIWE nonce. */
+//
+// Audit M-02: client-side throttle + cache. The backend is the real line
+// of defense, but a client-side guard prevents accidental self-DoS
+// (React StrictMode double-invoke + retry loops) and surfaces
+// backend-issued 429 backoffs in a consistent way.
+const NONCE_THROTTLE_MS = 5_000;
+const NONCE_CACHE_TTL_MS = 60_000;
+let lastNonceFetchAt = 0;
+let cachedNonce: { value: string; expiresAt: number } | null = null;
+let inFlightNonce: Promise<string> | null = null;
+
+/**
+ * Custom error raised when the backend asks the client to back off
+ * (HTTP 429). UI components can catch this to render a "please wait
+ * before retrying" message instead of a generic failure.
+ */
+export class SiweRateLimitedError extends Error {
+  constructor(public readonly retryAfterSeconds?: number) {
+    super(
+      retryAfterSeconds
+        ? `SIWE nonce request rate-limited; retry after ${retryAfterSeconds}s`
+        : 'SIWE nonce request rate-limited; please retry shortly',
+    );
+    this.name = 'SiweRateLimitedError';
+  }
+}
+
+/** @internal Test-only helper to reset the throttle/cache. */
+export function __resetSiweNonceStateForTests(): void {
+  lastNonceFetchAt = 0;
+  cachedNonce = null;
+  inFlightNonce = null;
+}
+
 export async function fetchSiweNonce(): Promise<string> {
-  const res = await fetch(`${API_URL}/api/auth/siwe/nonce`, {
-    method: 'GET',
-    credentials: 'include',
-    headers: { accept: 'application/json' },
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch SIWE nonce (${res.status})`);
+  // Serve from cache if it has not expired.
+  const now = Date.now();
+  if (cachedNonce && cachedNonce.expiresAt > now) {
+    return cachedNonce.value;
   }
-  const data = (await res.json()) as { nonce?: string };
-  if (!data?.nonce || typeof data.nonce !== 'string') {
-    throw new Error('Malformed SIWE nonce response from backend');
+  // De-duplicate concurrent callers — the backend issues one nonce per
+  // request and we want the next sign-in to use *one* even if two React
+  // effects race to fetch it.
+  if (inFlightNonce) return inFlightNonce;
+
+  // Throttle: at most one fetch every NONCE_THROTTLE_MS, except when
+  // there is no cached value yet (first call after page load).
+  const elapsed = now - lastNonceFetchAt;
+  if (lastNonceFetchAt !== 0 && elapsed < NONCE_THROTTLE_MS) {
+    throw new SiweRateLimitedError(
+      Math.ceil((NONCE_THROTTLE_MS - elapsed) / 1000),
+    );
   }
-  return data.nonce;
+  lastNonceFetchAt = now;
+
+  inFlightNonce = (async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/siwe/nonce`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
+      });
+      if (res.status === 429) {
+        const retryAfter = parseInt(res.headers.get('retry-after') ?? '', 10);
+        throw new SiweRateLimitedError(
+          Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+        );
+      }
+      if (!res.ok) {
+        throw new Error(`Failed to fetch SIWE nonce (${res.status})`);
+      }
+      const data = (await res.json()) as { nonce?: string };
+      if (!data?.nonce || typeof data.nonce !== 'string') {
+        throw new Error('Malformed SIWE nonce response from backend');
+      }
+      cachedNonce = { value: data.nonce, expiresAt: Date.now() + NONCE_CACHE_TTL_MS };
+      return data.nonce;
+    } finally {
+      inFlightNonce = null;
+    }
+  })();
+
+  return inFlightNonce;
+}
+
+/** Invalidate the cached SIWE nonce so the next call hits the backend. */
+export function invalidateSiweNonceCache(): void {
+  cachedNonce = null;
 }
 
 /**
@@ -111,6 +185,9 @@ export async function verifySiwe(args: {
       body?.message ?? `SIWE verification failed (${res.status})`,
     );
   }
+  // The backend marks the nonce as consumed; invalidate any cached copy
+  // so a subsequent re-bind fetches a fresh one.
+  invalidateSiweNonceCache();
 }
 
 /**

@@ -25,6 +25,9 @@ vi.mock('@/lib/api', () => ({
   updateInfluencer: vi.fn(),
   deleteInfluencer: vi.fn(),
   logOutreach: vi.fn(),
+  bootstrapCsrfToken: vi.fn().mockResolvedValue(undefined),
+  logDataExportEvent: vi.fn().mockResolvedValue(undefined),
+  recordCookieConsent: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockFetch = vi.fn();

@@ -14,6 +14,7 @@ import type { User, LoginCredentials, Role } from '@/types';
 import { csrfHeaders } from '@/lib/csrf';
 import { API_URL } from '@/lib/config';
 import { siweLogout } from '@/lib/web3/siwe';
+import { bootstrapCsrfToken } from '@/lib/api';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 // Tokens are now stored as httpOnly cookies set by the backend.
@@ -22,12 +23,17 @@ import { siweLogout } from '@/lib/web3/siwe';
 
 const USER_KEY = 'crm_user';
 /**
- * Maximum age of the client-cached user profile. On load, any entry older
- * than this is discarded so stale PII cannot linger in sessionStorage
- * indefinitely — the authoritative source is always the `/api/auth/me`
- * response made on mount.
+ * Maximum age of the client-cached user profile. On load, any entry
+ * older than this is discarded so a stale role cannot linger past the
+ * window during which the backend has revoked it (audit H-01). 5 min
+ * matches the upper bound of "tolerable role-revocation latency" used
+ * by the backend session-revocation runbook; combined with the
+ * BroadcastChannel listener below, an explicit revocation event from
+ * any other tab purges the cache immediately.
  */
-const USER_CACHE_TTL_MS = 15 * 60 * 1000;
+const USER_CACHE_TTL_MS = 5 * 60 * 1000;
+/** BroadcastChannel name used for cross-tab role-revocation pushes. */
+const ROLE_REVOCATION_CHANNEL = 'crm:role-revocation';
 /** Idle timeout before auto-logout (30 min). */
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
@@ -139,6 +145,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    // (audit L-03) Abort the in-flight bootstrap fetch on unmount so a
+    // navigation away from the layout host doesn't leak the request or
+    // accidentally setState on an unmounted tree.
+    const controller = new AbortController();
+
+    // (audit M-05) Seed the XSRF-TOKEN cookie before any state-changing
+    // call. Best-effort — failure surfaces later via the request
+    // interceptor in lib/api.ts.
+    void bootstrapCsrfToken();
 
     (async () => {
       try {
@@ -147,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credentials: 'include',
           headers: { accept: 'application/json' },
           cache: 'no-store',
+          signal: controller.signal,
         });
 
         if (!res.ok) {
@@ -170,15 +186,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             clearUser();
           }
         }
-      } catch {
-        // keep cached user if any
+      } catch (err) {
+        // Swallow abort errors — they are expected on unmount. Keep the
+        // cached user for any other transient failure.
+        if ((err as { name?: string })?.name === 'AbortError') return;
       } finally {
         if (!cancelled) setIsLoading(false);
       }
     })();
 
+    // (audit H-01) Listen for cross-tab role-revocation pushes. When
+    // any other tab logs out or observes a forced session invalidation,
+    // it broadcasts on `ROLE_REVOCATION_CHANNEL` and every other tab
+    // hard-clears the cached user immediately, regardless of TTL.
+    let channel: BroadcastChannel | null = null;
+    const handleRevocation = () => {
+      if (cancelled) return;
+      setUser(null);
+      clearUser();
+    };
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        channel = new BroadcastChannel(ROLE_REVOCATION_CHANNEL);
+        channel.addEventListener('message', handleRevocation);
+      } catch (err) {
+        // Cross-tab role revocation is a security feature (audit H-01).
+        // Log so operators / Sentry can detect when it is silently
+        // unavailable; the storage-event fallback below still fires.
+        console.warn('[auth] BroadcastChannel unavailable; falling back to storage events.', err);
+        channel = null;
+      }
+    }
+    // Fallback for environments without BroadcastChannel: listen to the
+    // `storage` event, which fires in *other* tabs when sessionStorage /
+    // localStorage is mutated — we use the user-key removal as the
+    // signal.
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === USER_KEY && e.newValue === null) {
+        handleRevocation();
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', handleStorage);
+    }
+
     return () => {
       cancelled = true;
+      controller.abort();
+      if (channel) {
+        channel.removeEventListener('message', handleRevocation);
+        channel.close();
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storage', handleStorage);
+      }
     };
   }, []);
 
@@ -237,6 +298,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(null);
     clearUser();
+    // (audit H-01) Push a role-revocation event to every other tab so
+    // cached `user` state is cleared immediately. This closes the
+    // window during which a stale role would otherwise remain visible
+    // for up to USER_CACHE_TTL_MS.
+    if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+      try {
+        const ch = new BroadcastChannel(ROLE_REVOCATION_CHANNEL);
+        ch.postMessage({ type: 'logout', at: Date.now() });
+        ch.close();
+      } catch {
+        // Ignore — the storage-event fallback in other tabs will fire
+        // because `clearUser` removed the sessionStorage entry.
+      }
+    }
     router.push('/login');
   }, [router]);
 

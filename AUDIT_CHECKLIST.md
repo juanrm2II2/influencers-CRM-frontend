@@ -13,6 +13,8 @@ score to the step summary, and can be configured to fail the build via
 `--enforce` (default is report-only so adopting the audit does not break CI).
 
 Current score at time of audit: **10 %** (5 High + 6 Medium + 6 Low open).
+Score after this remediation pass: **100 %** (all 17 findings fixed; see commit history
+on `copilot/fix-audit-issues`).
 
 ---
 
@@ -28,45 +30,45 @@ Current score at time of audit: **10 %** (5 High + 6 Medium + 6 Low open).
 
 ## HIGH severity (weight 12 each)
 
-- [ ] **H-01** `context/AuthContext.tsx:30` — Reduce `USER_CACHE_TTL_MS` ≤ 5 min and add
+- [x] **H-01** `context/AuthContext.tsx:30` — Reduce `USER_CACHE_TTL_MS` ≤ 5 min and add
       server-push role-revocation sync.
-- [ ] **H-02** `lib/web3/hooks.ts:~202` — Validate `amountEth` (numeric, positive, ≤18 dp,
+- [x] **H-02** `lib/web3/hooks.ts:~202` — Validate `amountEth` (numeric, positive, ≤18 dp,
       within [MIN, MAX]) before `parseEther`.
-- [ ] **H-03** `lib/api.ts:8-24` — Add `timeout: 30000`, AbortController, and 401-dedup to
+- [x] **H-03** `lib/api.ts:8-24` — Add `timeout: 30000`, AbortController, and 401-dedup to
       the axios client.
-- [ ] **H-04** `middleware.ts:~117` — Add `AbortSignal.timeout(3000)` and signed-cookie
+- [x] **H-04** `middleware.ts:~117` — Add `AbortSignal.timeout(3000)` and signed-cookie
       fallback cache to `fetchAuthenticatedRole`.
-- [ ] **H-05** `lib/web3/contracts.ts:146-162` — Fail the **production build** when contract
+- [x] **H-05** `lib/web3/contracts.ts:146-162` — Fail the **production build** when contract
       addresses are missing or invalid instead of silently using the zero address.
 
 ## MEDIUM severity (weight 4 each)
 
-- [ ] **M-01** `lib/web3/config.ts:54-62` — Document WalletConnect project-id rotation;
+- [x] **M-01** `lib/web3/config.ts:54-62` — Document WalletConnect project-id rotation;
       add `gitleaks` pre-commit hook.
-- [ ] **M-02** `lib/web3/siwe.ts:127-152` — Client-side throttle + cache for SIWE nonce
+- [x] **M-02** `lib/web3/siwe.ts:127-152` — Client-side throttle + cache for SIWE nonce
       fetches; handle backend 429s.
-- [ ] **M-03** `lib/sanitize.ts:8-18` — Replace SSR no-op branch with an isomorphic
+- [x] **M-03** `lib/sanitize.ts:8-18` — Replace SSR no-op branch with an isomorphic
       sanitizer; unit-test the SSR path.
-- [ ] **M-04** `app/data-export/page.tsx:42-52` — POST audit event before the blob
+- [x] **M-04** `app/data-export/page.tsx:42-52` — POST audit event before the blob
       download (GDPR Art. 30).
-- [ ] **M-05** `lib/api.ts:15-24` — Bootstrap CSRF token on app load and reject
+- [x] **M-05** `lib/api.ts:15-24` — Bootstrap CSRF token on app load and reject
       state-changing requests client-side when the cookie is absent.
-- [ ] **M-06** `app/data-export/page.tsx:11-37` — Neutralize CSV formula-injection
+- [x] **M-06** `app/data-export/page.tsx:11-37` — Neutralize CSV formula-injection
       prefixes (`=`, `+`, `-`, `@`, `\t`, `\r`) before writing each field; quote every
       field unconditionally; add a unit test for the injection vector.
 
 ## LOW severity (weight 1 each)
 
-- [ ] **L-01** `lib/redirect.ts:29-41` — Explicitly reject `..` path segments.
-- [ ] **L-02** `components/web3/TransactionReceipt.tsx:74,96` — Chain-aware block-explorer
+- [x] **L-01** `lib/redirect.ts:29-41` — Explicitly reject `..` path segments.
+- [x] **L-02** `components/web3/TransactionReceipt.tsx:74,96` — Chain-aware block-explorer
       URL.
-- [ ] **L-03** `context/AuthContext.tsx:140-183` — `AbortController` on the bootstrap
+- [x] **L-03** `context/AuthContext.tsx:140-183` — `AbortController` on the bootstrap
       `/api/auth/me` fetch.
-- [ ] **L-04** `lib/web3/hooks.ts:140-150` — Three-state return
+- [x] **L-04** `lib/web3/hooks.ts:140-150` — Three-state return
       (`contribution|isLoading|error`) from `useUserContribution`.
-- [ ] **L-05** `next.config.mjs:27-31` — Explicit `Cache-Control: immutable` for SRI
+- [x] **L-05** `next.config.mjs:27-31` — Explicit `Cache-Control: immutable` for SRI
       bundles.
-- [ ] **L-06** `app/cookie-policy/page.tsx` — Mirror cookie-consent state to the backend.
+- [x] **L-06** `app/cookie-policy/page.tsx` — Mirror cookie-consent state to the backend.
 
 ---
 

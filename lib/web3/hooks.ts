@@ -1,6 +1,6 @@
 'use client';
 
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, useSwitchChain, useSignMessage, useChainId } from 'wagmi';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, useSwitchChain, useSignMessage } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
 import { useState, useCallback, useMemo } from 'react';
 import { TOKEN_SALE_ABI, VESTING_ABI, CONTRACT_ADDRESSES } from './contracts';
@@ -370,7 +370,6 @@ export function useWhitelistManagement() {
  */
 export function useSiwe() {
   const { address } = useAccount();
-  const chainId = useChainId();
   const { signMessageAsync } = useSignMessage();
   const [status, setStatus] = useState<'idle' | 'signing' | 'verifying' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -380,9 +379,11 @@ export function useSiwe() {
     setError(null);
     try {
       setStatus('signing');
+      // The SIWE message is bound to EXPECTED_CHAIN_ID by `performSiwe`;
+      // we intentionally do NOT pass the wallet's current chainId so a
+      // signature on the "wrong" network cannot be produced client-side.
       await performSiwe({
         address,
-        chainId,
         signMessage: async ({ message, account }) =>
           signMessageAsync({ message, account }),
       });
@@ -393,7 +394,7 @@ export function useSiwe() {
       setStatus('error');
       throw err;
     }
-  }, [address, chainId, signMessageAsync]);
+  }, [address, signMessageAsync]);
 
   const reset = useCallback(() => {
     setStatus('idle');

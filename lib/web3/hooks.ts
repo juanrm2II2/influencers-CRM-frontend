@@ -138,7 +138,7 @@ export function useTokenSaleInfo() {
 // ─── User contribution ───────────────────────────────────────────────────────
 
 export function useUserContribution(address: `0x${string}` | undefined) {
-  const { data, isLoading, refetch } = useReadContract({
+  const { data, isLoading, error, refetch } = useReadContract({
     address: CONTRACT_ADDRESSES.tokenSale,
     abi: TOKEN_SALE_ABI,
     functionName: 'contributions',
@@ -146,7 +146,16 @@ export function useUserContribution(address: `0x${string}` | undefined) {
     query: { enabled: !!address },
   });
 
-  return { contribution: data ?? BigInt(0), isLoading, refetch };
+  // Audit L-04: distinguish "RPC returned undefined" from "user has
+  // contributed 0". The previous shape collapsed both into `0n`, which
+  // caused the UI to render "0 contributed" when the correct message
+  // was "unknown — please retry".
+  return {
+    contribution: typeof data === 'bigint' ? data : undefined,
+    isLoading,
+    error: error ?? null,
+    refetch,
+  };
 }
 
 // ─── Whitelist status ────────────────────────────────────────────────────────
@@ -181,6 +190,118 @@ export function useWhitelistStatus(address: `0x${string}` | undefined) {
 
 // ─── Contribute ──────────────────────────────────────────────────────────────
 
+/**
+ * Hard-coded sane defaults for the contribution range. They can be
+ * overridden per deployment with `NEXT_PUBLIC_MIN_CONTRIBUTION_ETH` and
+ * `NEXT_PUBLIC_MAX_CONTRIBUTION_ETH`. Strings (not numbers) so the
+ * 18-decimal precision of `parseEther` is preserved end-to-end and
+ * floating-point rounding can never round a min/max into a value the
+ * contract would reject.
+ */
+function readContributionEnv(name: string, fallback: string): string {
+  const raw = process.env[name];
+  if (typeof raw !== 'string' || raw.trim() === '') return fallback;
+  // Validate the override is a syntactically valid decimal so a bad env
+  // var cannot poison the bounds at runtime — falls back to the default
+  // and warns once per page lifetime.
+  if (!/^\d+(\.\d{1,18})?$/.test(raw.trim())) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.warn(`[web3] ${name}="${raw}" is not a valid decimal; falling back to ${fallback}.`);
+    }
+    return fallback;
+  }
+  return raw.trim();
+}
+
+const MIN_CONTRIBUTION_ETH_STR = readContributionEnv('NEXT_PUBLIC_MIN_CONTRIBUTION_ETH', '0.01');
+const MAX_CONTRIBUTION_ETH_STR = readContributionEnv('NEXT_PUBLIC_MAX_CONTRIBUTION_ETH', '100');
+/** Soft cap above which the user must explicitly confirm the amount. */
+const SOFT_CAP_ETH_STR = readContributionEnv('NEXT_PUBLIC_SOFT_CAP_CONTRIBUTION_ETH', '10');
+
+export const MIN_CONTRIBUTION_WEI = parseEther(MIN_CONTRIBUTION_ETH_STR);
+export const MAX_CONTRIBUTION_WEI = parseEther(MAX_CONTRIBUTION_ETH_STR);
+export const SOFT_CAP_WEI = parseEther(SOFT_CAP_ETH_STR);
+
+export class InvalidContributionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidContributionError';
+  }
+}
+
+/**
+ * Validate a user-supplied contribution amount **before** it is handed to
+ * `parseEther`, which would otherwise throw on malformed strings or
+ * silently truncate beyond 18 decimals (audit H-02).
+ *
+ * Rules:
+ *   - must be a non-empty string
+ *   - decimal-only (no scientific notation / hex / leading sign / spaces)
+ *   - <= 18 fractional digits (parseEther truncates anything beyond)
+ *   - strictly > 0
+ *   - within `[MIN_CONTRIBUTION_WEI, MAX_CONTRIBUTION_WEI]`
+ *
+ * Returns the parsed wei value on success; throws
+ * {@link InvalidContributionError} on any rule violation. Exported for
+ * unit tests.
+ *
+ * @param options.confirmedAboveSoftCap  When the parsed amount exceeds
+ *   `SOFT_CAP_WEI`, callers must pass `true` here (typically gated on a
+ *   confirmation dialog). This catches fat-finger contributions
+ *   (`1000` instead of `1`) before the wallet prompt appears.
+ */
+export function parseContributionAmount(
+  amountEth: string,
+  options?: { confirmedAboveSoftCap?: boolean },
+): bigint {
+  if (typeof amountEth !== 'string') {
+    throw new InvalidContributionError('Amount is required.');
+  }
+  const trimmed = amountEth.trim();
+  if (trimmed === '') {
+    throw new InvalidContributionError('Amount is required.');
+  }
+  // Strict decimal notation. No leading +/-, no exponent, no hex.
+  // The fractional part is capped at 18 digits because `parseEther`
+  // silently truncates anything past 18 — we want to reject the input
+  // up-front rather than send a different value than the user typed.
+  if (!/^\d+(\.\d{1,18})?$/.test(trimmed)) {
+    if (/^\d+\.\d{19,}$/.test(trimmed)) {
+      throw new InvalidContributionError(
+        'Amount has too many decimals (max 18).',
+      );
+    }
+    throw new InvalidContributionError(
+      'Amount must be a positive decimal number (e.g. "1.5").',
+    );
+  }
+  let value: bigint;
+  try {
+    value = parseEther(trimmed);
+  } catch {
+    throw new InvalidContributionError('Amount could not be parsed as ETH.');
+  }
+  if (value <= 0n) {
+    throw new InvalidContributionError('Amount must be greater than 0.');
+  }
+  if (value < MIN_CONTRIBUTION_WEI) {
+    throw new InvalidContributionError(
+      `Amount is below the minimum contribution (${MIN_CONTRIBUTION_ETH_STR} ETH).`,
+    );
+  }
+  if (value > MAX_CONTRIBUTION_WEI) {
+    throw new InvalidContributionError(
+      `Amount exceeds the maximum contribution (${MAX_CONTRIBUTION_ETH_STR} ETH).`,
+    );
+  }
+  if (value > SOFT_CAP_WEI && !options?.confirmedAboveSoftCap) {
+    throw new InvalidContributionError(
+      `Amount exceeds ${SOFT_CAP_ETH_STR} ETH; please confirm the value before sending.`,
+    );
+  }
+  return value;
+}
+
 export function useContribute() {
   const [writeState, setWriteState] = useState<WriteState>({ status: 'idle' });
   const { writeContractAsync } = useWriteContract();
@@ -194,12 +315,18 @@ export function useContribute() {
   const txState = deriveTransactionState(writeState, receipt);
 
   const contribute = useCallback(
-    async (amountEth: string) => {
+    async (
+      amountEth: string,
+      options?: { confirmedAboveSoftCap?: boolean },
+    ) => {
       try {
         setWriteState({ status: 'pending' });
         assertContractConfigured(CONTRACT_ADDRESSES.tokenSale, 'Token sale');
+        // Validate BEFORE prompting the wallet so the user sees a
+        // human-readable message instead of `parseEther`'s opaque
+        // throw or — worse — a silent decimal truncation.
+        const value = parseContributionAmount(amountEth, options);
         await ensureCorrectChain();
-        const value = parseEther(amountEth);
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.tokenSale,
           abi: TOKEN_SALE_ABI,

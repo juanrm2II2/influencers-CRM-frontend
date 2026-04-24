@@ -14,6 +14,34 @@ if (process.env.NODE_ENV === 'production') {
       `NEXT_PUBLIC_API_URL must use HTTPS in production. Received: "${apiUrl}".`
     );
   }
+
+  // ── Smart-contract address validation (audit H-05) ───────────────────
+  // A missing / malformed contract address used to silently fall back to
+  // the zero address at module load — production builds would compile
+  // and ship a UI that would prompt users to send ETH to 0x0…0 if any
+  // runtime guard was bypassed. Refuse to build instead.
+  for (const key of [
+    'NEXT_PUBLIC_TOKEN_SALE_ADDRESS',
+    'NEXT_PUBLIC_VESTING_ADDRESS',
+  ]) {
+    const value = process.env[key];
+    if (!value) {
+      throw new Error(
+        `${key} is required for production builds. ` +
+          'Set it to the deployed contract address (0x-prefixed 20-byte hex).'
+      );
+    }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(value)) {
+      throw new Error(
+        `${key} must be a valid 0x-prefixed 20-byte hex address. Received: "${value}".`
+      );
+    }
+    if (/^0x0{40}$/.test(value)) {
+      throw new Error(
+        `${key} must not be the zero address. Configure the deployed contract address.`
+      );
+    }
+  }
 }
 
 /** @type {import('next').NextConfig} */
@@ -65,6 +93,21 @@ const nextConfig = {
             value: 'max-age=63072000; includeSubDomains; preload',
           },
           { key: 'X-DNS-Prefetch-Control', value: 'on' },
+        ],
+      },
+      // ── SRI-protected static bundles (audit L-05) ────────────────────
+      // The /_next/static/* chunks are content-hashed and emit an
+      // `integrity` attribute on every <script> tag. Pin them to
+      // long-lived immutable caching so a stale CDN edge cannot serve an
+      // older hash after rotation (which would otherwise produce
+      // SRI-mismatch errors that block the page from booting).
+      {
+        source: '/_next/static/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
         ],
       },
     ];

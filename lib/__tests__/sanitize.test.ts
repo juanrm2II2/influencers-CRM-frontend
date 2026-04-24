@@ -64,15 +64,21 @@ describe('sanitizeText (SSR fallback)', () => {
     });
   });
 
-  it('returns input as-is when window is undefined (SSR)', () => {
+  it('strips HTML tags via the dependency-free fallback when window is undefined (SSR)', () => {
     // Simulate SSR by removing window
     const saved = globalThis.window;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (globalThis as any).window = undefined;
 
-    // In SSR, React's JSX escaping handles XSS prevention
+    // Plain text round-trips unchanged.
     expect(sanitizeText('plain text')).toBe('plain text');
-    expect(sanitizeText('<script>alert(1)</script>')).toBe('<script>alert(1)</script>');
+    // <script> blocks and their contents are stripped, not passed through.
+    expect(sanitizeText('<script>alert(1)</script>')).toBe('');
+    expect(sanitizeText('<b>bold</b> text')).toBe('bold text');
+    expect(sanitizeText('<div onmouseover="x">hi</div>')).toBe('hi');
+    expect(sanitizeText('<img src=x onerror="alert(1)">safe')).toBe('safe');
+    expect(sanitizeText('<style>body{}</style>visible')).toBe('visible');
+    expect(sanitizeText('<!-- comment -->kept')).toBe('kept');
 
     // Restore
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

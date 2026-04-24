@@ -1,10 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchSiweNonce, verifySiwe, buildSiweMessage, performSiwe } from '../siwe';
+import {
+  fetchSiweNonce,
+  verifySiwe,
+  buildSiweMessage,
+  performSiwe,
+  invalidateSiweNonceCache,
+  __resetSiweNonceStateForTests,
+  SiweRateLimitedError,
+} from '../siwe';
 
 const MOCK_API_URL = 'http://localhost:3001';
 
 describe('SIWE client', () => {
   beforeEach(() => {
+    __resetSiweNonceStateForTests();
     vi.stubGlobal('fetch', vi.fn());
     // buildSiweMessage requires window.location; jsdom provides it.
   });
@@ -49,6 +58,44 @@ describe('SIWE client', () => {
       });
 
       await expect(fetchSiweNonce()).rejects.toThrow('Malformed SIWE nonce response from backend');
+    });
+
+    it('caches the nonce so concurrent callers share a single request', async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ nonce: 'cached-nonce' }),
+      });
+
+      const [a, b] = await Promise.all([fetchSiweNonce(), fetchSiweNonce()]);
+
+      expect(a).toBe('cached-nonce');
+      expect(b).toBe('cached-nonce');
+      // Only one network call despite two concurrent fetches.
+      expect((fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+    });
+
+    it('throttles a second non-cached fetch with SiweRateLimitedError', async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ nonce: 'first' }),
+      });
+
+      await fetchSiweNonce();
+      // Force the cache to expire so the next call would normally hit the network.
+      invalidateSiweNonceCache();
+
+      await expect(fetchSiweNonce()).rejects.toBeInstanceOf(SiweRateLimitedError);
+    });
+
+    it('surfaces a backend 429 as SiweRateLimitedError', async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: { get: (h: string) => (h === 'retry-after' ? '12' : null) },
+        json: async () => ({}),
+      });
+
+      await expect(fetchSiweNonce()).rejects.toBeInstanceOf(SiweRateLimitedError);
     });
   });
 

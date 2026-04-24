@@ -4,7 +4,17 @@ vi.mock('@rainbow-me/rainbowkit', () => ({
   getDefaultConfig: () => ({}),
 }));
 
-import { formatWei, formatTokenAmount, ChainMismatchError, assertContractConfigured } from '../hooks';
+import {
+  formatWei,
+  formatTokenAmount,
+  ChainMismatchError,
+  assertContractConfigured,
+  parseContributionAmount,
+  InvalidContributionError,
+  MIN_CONTRIBUTION_WEI,
+  MAX_CONTRIBUTION_WEI,
+  SOFT_CAP_WEI,
+} from '../hooks';
 
 describe('ChainMismatchError', () => {
   it('reports expected and actual chain IDs', () => {
@@ -93,5 +103,65 @@ describe('assertContractConfigured', () => {
     expect(() =>
       assertContractConfigured('0x1234567890123456789012345678901234567890', 'Token sale'),
     ).not.toThrow();
+  });
+});
+
+describe('parseContributionAmount', () => {
+  // Defaults: MIN=0.01 ETH, SOFT=10 ETH, MAX=100 ETH.
+  it('rejects empty / non-string / whitespace input', () => {
+    expect(() => parseContributionAmount('')).toThrow(InvalidContributionError);
+    expect(() => parseContributionAmount('   ')).toThrow(InvalidContributionError);
+    // @ts-expect-error – exercising the runtime guard
+    expect(() => parseContributionAmount(undefined)).toThrow(InvalidContributionError);
+    // @ts-expect-error – exercising the runtime guard
+    expect(() => parseContributionAmount(123)).toThrow(InvalidContributionError);
+  });
+
+  it('rejects malformed strings (sign, exponent, hex, NaN, multi-dot)', () => {
+    expect(() => parseContributionAmount('-1')).toThrow(InvalidContributionError);
+    expect(() => parseContributionAmount('+1')).toThrow(InvalidContributionError);
+    expect(() => parseContributionAmount('1e3')).toThrow(InvalidContributionError);
+    expect(() => parseContributionAmount('0x1')).toThrow(InvalidContributionError);
+    expect(() => parseContributionAmount('one')).toThrow(InvalidContributionError);
+    expect(() => parseContributionAmount('1.2.3')).toThrow(InvalidContributionError);
+  });
+
+  it('rejects amounts with >18 fractional digits', () => {
+    expect(() => parseContributionAmount('1.0000000000000000001')).toThrow(/decimals/);
+  });
+
+  it('rejects zero', () => {
+    expect(() => parseContributionAmount('0')).toThrow(InvalidContributionError);
+    expect(() => parseContributionAmount('0.0')).toThrow(InvalidContributionError);
+  });
+
+  it('rejects amounts below the minimum contribution', () => {
+    expect(() => parseContributionAmount('0.001')).toThrow(/minimum/);
+  });
+
+  it('rejects amounts above the maximum contribution', () => {
+    expect(() => parseContributionAmount('1000', { confirmedAboveSoftCap: true })).toThrow(/maximum/);
+  });
+
+  it('rejects amounts above the soft cap without confirmation', () => {
+    // 25 > soft cap 10
+    expect(() => parseContributionAmount('25')).toThrow(/confirm/);
+  });
+
+  it('accepts amounts above the soft cap when confirmed', () => {
+    expect(parseContributionAmount('25', { confirmedAboveSoftCap: true })).toBe(
+      25_000_000_000_000_000_000n,
+    );
+  });
+
+  it('returns the parsed wei value for valid amounts', () => {
+    expect(parseContributionAmount('1')).toBe(1_000_000_000_000_000_000n);
+    expect(parseContributionAmount('0.5')).toBe(500_000_000_000_000_000n);
+    expect(parseContributionAmount('0.01')).toBe(MIN_CONTRIBUTION_WEI);
+  });
+
+  it('exposes consistent bounds', () => {
+    expect(MIN_CONTRIBUTION_WEI).toBeLessThan(SOFT_CAP_WEI);
+    expect(SOFT_CAP_WEI).toBeLessThan(MAX_CONTRIBUTION_WEI);
   });
 });

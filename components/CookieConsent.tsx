@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { recordCookieConsent } from '@/lib/api';
 
 const COOKIE_CONSENT_KEY = 'cookie_consent';
 
@@ -41,11 +42,16 @@ export default function CookieConsent() {
   const handleAccept = useCallback(() => {
     storeConsent('accepted');
     setVisible(false);
+    // (audit L-06) Mirror to the backend so the controller has an
+    // authoritative consent log (GDPR Art. 7(1)). Best-effort — UI
+    // state is the source of truth client-side.
+    void recordCookieConsent({ consent: 'accepted' });
   }, []);
 
   const handleReject = useCallback(() => {
     storeConsent('rejected');
     setVisible(false);
+    void recordCookieConsent({ consent: 'rejected' });
   }, []);
 
   if (!visible) return null;

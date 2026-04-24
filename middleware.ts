@@ -115,6 +115,19 @@ export async function middleware(request: NextRequest) {
   );
   if (isAdminPath && token) {
     const role = await fetchAuthenticatedRole(request);
+    if (role === 'TIMEOUT') {
+      // (audit H-04) Fail-closed for admin routes when the backend did
+      // not answer in time. Returning a 503 instead of a silent redirect
+      // surfaces the outage to operators (via uptime checks) and stops
+      // any cached UI from rendering admin-only data when authorization
+      // could not be confirmed.
+      const response = new NextResponse(
+        'Service Unavailable: authentication backend did not respond in time.',
+        { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8' } },
+      );
+      applySecurityHeaders(response);
+      return response;
+    }
     if (role !== 'admin') {
       // Non-admin (or unauthenticated-per-backend) → redirect to token-sale root.
       const redirectUrl = new URL('/token-sale', request.url);
@@ -132,29 +145,87 @@ export async function middleware(request: NextRequest) {
 /**
  * Resolve the authenticated user's role by calling the backend's
  * `/api/auth/me` endpoint. Forwards cookies so the backend can validate the
- * session. Returns `null` when the backend rejects the request or is
- * unreachable, in which case callers should treat the user as unauthorized.
+ * session.
+ *
+ * Returns one of:
+ *   - the role string (e.g. `'admin'`)
+ *   - `null` when the backend rejects the request
+ *   - the literal `'TIMEOUT'` when the backend did not answer within
+ *     {@link ROLE_FETCH_TIMEOUT_MS} so the caller can fail-closed for
+ *     admin routes (audit H-04). Treating a timeout as "non-admin" is
+ *     not safe: a partitioned backend would silently lock every
+ *     legitimate admin out of admin-gated pages, hiding the outage.
+ *
+ * The result is memoized in-memory for {@link ROLE_CACHE_TTL_MS} keyed
+ * by the session cookie, so a burst of navigations does not amplify
+ * into a fan-out of `/api/auth/me` calls.
  */
-async function fetchAuthenticatedRole(request: NextRequest): Promise<string | null> {
+const ROLE_FETCH_TIMEOUT_MS = 3_000;
+const ROLE_CACHE_TTL_MS = 60_000;
+const ROLE_CACHE_MAX_ENTRIES = 1024;
+const TIMEOUT_SENTINEL = 'TIMEOUT' as const;
+type RoleResult = string | null | typeof TIMEOUT_SENTINEL;
+const roleCache: Map<string, { role: RoleResult; expiresAt: number }> = new Map();
+
+function pruneRoleCache(now: number): void {
+  if (roleCache.size <= ROLE_CACHE_MAX_ENTRIES) return;
+  for (const [k, v] of roleCache) {
+    if (v.expiresAt <= now) roleCache.delete(k);
+  }
+  // Hard-cap: drop oldest insertion-order entries if still too large.
+  while (roleCache.size > ROLE_CACHE_MAX_ENTRIES) {
+    const oldestKey = roleCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    roleCache.delete(oldestKey);
+  }
+}
+
+async function fetchAuthenticatedRole(request: NextRequest): Promise<RoleResult> {
+  const cookieHeader = request.headers.get('cookie') ?? '';
+  // Memoization key: the full cookie header (which contains the session
+  // token). This is ephemeral, in-memory, edge-runtime per-isolate, and
+  // never written to logs/disk.
+  const now = Date.now();
+  const cached = roleCache.get(cookieHeader);
+  if (cached && cached.expiresAt > now) {
+    return cached.role;
+  }
+
+  let role: RoleResult;
   try {
     const res = await fetch(`${API_URL}/api/auth/me`, {
       method: 'GET',
       headers: {
         // Forward the incoming cookies so the backend sees the user's session.
-        cookie: request.headers.get('cookie') ?? '',
+        cookie: cookieHeader,
         accept: 'application/json',
       },
       // Edge runtime: avoid caching auth responses.
       cache: 'no-store',
+      // (audit H-04) bound the backend round-trip so a slow / partitioned
+      // backend cannot block every protected navigation indefinitely.
+      signal: AbortSignal.timeout(ROLE_FETCH_TIMEOUT_MS),
     });
-    if (!res.ok) return null;
-    const data = (await res.json().catch(() => null)) as
-      | { user?: { role?: string }; role?: string }
-      | null;
-    return data?.user?.role ?? data?.role ?? null;
-  } catch {
-    return null;
+    if (!res.ok) {
+      role = null;
+    } else {
+      const data = (await res.json().catch(() => null)) as
+        | { user?: { role?: string }; role?: string }
+        | null;
+      role = data?.user?.role ?? data?.role ?? null;
+    }
+  } catch (err) {
+    // AbortSignal.timeout() throws TimeoutError (DOMException name=TimeoutError).
+    if (err instanceof DOMException && err.name === 'TimeoutError') {
+      role = TIMEOUT_SENTINEL;
+    } else {
+      role = null;
+    }
   }
+
+  roleCache.set(cookieHeader, { role, expiresAt: now + ROLE_CACHE_TTL_MS });
+  pruneRoleCache(now);
+  return role;
 }
 
 function applySecurityHeaders(response: NextResponse): void {

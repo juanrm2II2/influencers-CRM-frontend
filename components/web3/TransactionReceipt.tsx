@@ -1,15 +1,11 @@
 'use client';
 
 import type { TransactionState } from '@/types/web3';
+import { explorerTxUrl } from '@/lib/web3/explorer';
 
 interface TransactionReceiptProps {
   txState: TransactionState;
   onReset: () => void;
-}
-
-function explorerUrl(hash: `0x${string}`): string {
-  // Default to etherscan; in production this should be chain-aware
-  return `https://etherscan.io/tx/${hash}`;
 }
 
 export default function TransactionReceipt({ txState, onReset }: TransactionReceiptProps) {
@@ -69,9 +65,9 @@ export default function TransactionReceipt({ txState, onReset }: TransactionRece
             </svg>
             <div>
               <p className="text-gray-700">Transaction submitted, waiting for confirmation…</p>
-              {txState.hash && (
+              {txState.hash && explorerTxUrl(txState.hash) && (
                 <a
-                  href={explorerUrl(txState.hash)}
+                  href={explorerTxUrl(txState.hash) ?? undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-blue-600 hover:underline"
@@ -92,14 +88,16 @@ export default function TransactionReceipt({ txState, onReset }: TransactionRece
                 <div className="text-sm text-gray-500 mt-1 space-y-0.5">
                   <p>Block: {txState.receipt.blockNumber.toString()}</p>
                   <p>Gas used: {txState.receipt.gasUsed.toString()}</p>
-                  <a
-                    href={explorerUrl(txState.receipt.transactionHash)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    View on explorer ↗
-                  </a>
+                  {explorerTxUrl(txState.receipt.transactionHash) && (
+                    <a
+                      href={explorerTxUrl(txState.receipt.transactionHash) ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      View on explorer ↗
+                    </a>
+                  )}
                 </div>
               )}
             </div>

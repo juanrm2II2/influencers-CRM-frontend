@@ -58,7 +58,11 @@ function WalletSessionSync() {
     if (status === 'signing' || status === 'verifying') return;
 
     signedAddressRef.current = address;
-    signIn().catch(() => {
+    signIn().catch((err) => {
+      // Surface so operators can triage failing SIWE prompts; the hook
+      // also publishes the error on its `status === 'error'` state for
+      // UI components to read if they want to render a retry affordance.
+      console.warn('[Web3] Automatic SIWE sign-in failed:', err);
       // Allow a future reconnect to retry by clearing the remembered
       // address on failure.
       signedAddressRef.current = undefined;

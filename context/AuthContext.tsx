@@ -250,7 +250,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user || typeof window === 'undefined') return;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // Throttle reset calls so a stream of `mousemove` events (which can
+    // fire hundreds of times per second) does not churn timers and
+    // starve the event loop.
+    let lastReset = 0;
+    const RESET_THROTTLE_MS = 1000;
     const reset = () => {
+      const now = Date.now();
+      if (now - lastReset < RESET_THROTTLE_MS) return;
+      lastReset = now;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         void logoutRef.current();
@@ -266,7 +274,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     activityEvents.forEach((ev) => window.addEventListener(ev, reset, { passive: true }));
     // visibilitychange fires on `document`, not `window`.
     document.addEventListener('visibilitychange', reset);
-    reset();
+    // Arm the initial timer regardless of the throttle.
+    lastReset = Date.now();
+    timer = setTimeout(() => {
+      void logoutRef.current();
+    }, IDLE_TIMEOUT_MS);
     return () => {
       if (timer) clearTimeout(timer);
       activityEvents.forEach((ev) => window.removeEventListener(ev, reset));

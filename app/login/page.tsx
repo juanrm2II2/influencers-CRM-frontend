@@ -29,11 +29,16 @@ function LoginForm() {
   );
 
   // If the URL carried an *unsafe* `?redirect=` value, strip it so it can
-  // never be re-read, copy-pasted, or logged. A safe value is left in
-  // place for user-visible back/forward navigation.
+  // never be re-read, copy-pasted, or logged. We detect the unsafe case
+  // by: (a) a `redirect` param was present, (b) the sanitized target
+  // collapsed to the default (meaning the raw value was rejected), and
+  // (c) the raw value was not literally the default (otherwise it is
+  // safe to leave in place). A safe value is preserved for back/forward.
   useEffect(() => {
     const raw = searchParams?.get('redirect');
-    if (raw && redirectTarget === DEFAULT_POST_LOGIN_PATH && raw !== DEFAULT_POST_LOGIN_PATH) {
+    const fellBackToDefault = redirectTarget === DEFAULT_POST_LOGIN_PATH;
+    const rawWasNotDefault = raw !== DEFAULT_POST_LOGIN_PATH;
+    if (raw && fellBackToDefault && rawWasNotDefault) {
       router.replace('/login');
     }
   }, [searchParams, redirectTarget, router]);

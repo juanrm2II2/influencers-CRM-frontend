@@ -53,6 +53,8 @@ jobs:
       - run: npm run build
         env:
           NEXT_PUBLIC_API_URL: https://ci-build.invalid
+          NEXT_PUBLIC_TOKEN_SALE_ADDRESS: ${{ vars.NEXT_PUBLIC_TOKEN_SALE_ADDRESS || '0x000000000000000000000000000000000000dEaD' }}
+          NEXT_PUBLIC_VESTING_ADDRESS: ${{ vars.NEXT_PUBLIC_VESTING_ADDRESS || '0x000000000000000000000000000000000000bEEF' }}
 
   security:
     name: Security Scan

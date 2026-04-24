@@ -81,3 +81,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/dependency-review-action@v4
+
+  audit:
+    name: npm audit (production)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Fail the build on any HIGH/CRITICAL production advisory. MODERATE
+      # advisories are surfaced (via `continue-on-error: true`) but do
+      # not block the pipeline today — they are all transitive via
+      # @metamask/sdk → uuid / @metamask/rpc-errors and cannot be
+      # resolved without upstream releases. When those upstreams publish
+      # fixes, tighten this to `--audit-level=moderate` and drop the
+      # moderate-report step.
+      - name: Fail on high/critical production advisories
+        run: npm audit --omit=dev --audit-level=high
+      - name: Report moderate production advisories (non-blocking)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=moderate

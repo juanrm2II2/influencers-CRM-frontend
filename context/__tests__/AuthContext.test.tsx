@@ -202,7 +202,10 @@ describe("AuthContext", () => {
       expect(mockPush).toHaveBeenCalledWith("/dashboard");
 
       const stored = JSON.parse(sessionStorage.getItem("crm_user")!);
-      expect(stored.email).toBe("test@example.com");
+      // User is persisted wrapped in `{ user, storedAt }` so the TTL
+      // can be enforced on reload.
+      expect(stored.user.email).toBe("test@example.com");
+      expect(typeof stored.storedAt).toBe("number");
     });
 
     it("handles failed login with server message", async () => {

@@ -16,6 +16,16 @@ vi.mock('@/context/AuthContext', () => ({
   }),
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,10 +52,13 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith({
-        email: 'test@example.com',
-        password: 'password123',
-      });
+      expect(mockLogin).toHaveBeenCalledWith(
+        {
+          email: 'test@example.com',
+          password: 'password123',
+        },
+        expect.objectContaining({ redirectTo: '/dashboard' }),
+      );
     });
   });
 

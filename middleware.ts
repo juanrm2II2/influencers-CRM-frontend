@@ -7,6 +7,7 @@ const PUBLIC_PATHS = ['/login', '/privacy', '/terms', '/cookie-policy', '/dpa', 
 
 // Routes that additionally require the authenticated user to have `role === 'admin'`.
 // This list is the server-authoritative source of admin-gated pages.
+// Values MUST be lowercase, with no trailing slash — see `normalizePath` below.
 const ADMIN_PATHS = ['/token-sale/whitelist'];
 
 // ─── Security headers (F-004) ──────────────────────────────────────────────
@@ -22,14 +23,66 @@ const SECURITY_HEADERS: Record<string, string> = {
     'max-age=63072000; includeSubDomains; preload',
 };
 
+/**
+ * Canonicalize an incoming request pathname so authorization decisions
+ * cannot be bypassed via URL variants such as:
+ *   - trailing slashes       (/token-sale/whitelist/)
+ *   - mixed case             (/Token-Sale/Whitelist)
+ *   - percent-encoded bytes  (/token-sale/%77hitelist)
+ *   - repeated slashes       (/token-sale//whitelist)
+ *
+ * Returns an empty string when the path is malformed so callers can
+ * treat it as "no match" and fail closed.
+ */
+function normalizePath(pathname: string): string {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    return '';
+  }
+  // Collapse any run of slashes into a single slash.
+  decoded = decoded.replace(/\/+/g, '/');
+  // Lowercase for case-insensitive matching.
+  decoded = decoded.toLowerCase();
+  // Strip trailing slash (except for the root path).
+  if (decoded.length > 1 && decoded.endsWith('/')) {
+    decoded = decoded.slice(0, -1);
+  }
+  return decoded;
+}
+
+/**
+ * Decide whether a freshly-computed pathname is safe to place into the
+ * `?redirect=` query parameter forwarded to the login page. The login page
+ * (and any future consumer) may navigate to this value after a successful
+ * sign-in, so we must guarantee it resolves to a *same-origin* path —
+ * never to an absolute URL, protocol-relative URL (`//evil.com`),
+ * backslash-smuggled URL (`/\evil.com`), or anything else that a browser
+ * might interpret as cross-origin.
+ */
+function isSafeRedirectTarget(path: string): boolean {
+  if (typeof path !== 'string' || path.length === 0 || path.length > 512) return false;
+  // Must be a relative path rooted at /.
+  if (path[0] !== '/') return false;
+  // Reject protocol-relative and backslash-smuggled URLs.
+  if (path.startsWith('//') || path.startsWith('/\\')) return false;
+  // Reject anything containing a control character, whitespace, or a
+  // backslash anywhere in the path — these are classic open-redirect
+  // bypass vectors in browser URL parsers.
+  if (/[\x00-\x1f\x7f\s\\]/.test(path)) return false;
+  return true;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const normalizedPath = normalizePath(pathname);
 
   // Skip internal Next.js assets and API routes
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.startsWith('/favicon.ico')
+    normalizedPath.startsWith('/_next') ||
+    normalizedPath.startsWith('/api') ||
+    normalizedPath === '/favicon.ico'
   ) {
     return NextResponse.next();
   }
@@ -37,7 +90,7 @@ export async function middleware(request: NextRequest) {
   // ── Route-level auth guard ──────────────────────────────────────────────
   // NOTE: Token-presence check below is a UX-level guard only; JWT signature
   // and expiration validation happen on the backend for every API call.
-  const isPublic = PUBLIC_PATHS.some((p) => pathname === p);
+  const isPublic = PUBLIC_PATHS.some((p) => normalizedPath === p);
 
   const token =
     request.cookies.get('crm_access_token')?.value ??
@@ -45,7 +98,18 @@ export async function middleware(request: NextRequest) {
 
   if (!isPublic && !token) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
+    // Only forward the intended post-login destination when it is a
+    // guaranteed same-origin path. This closes an open-redirect vector:
+    // without this check, visiting e.g. `//evil.com` would produce
+    // `/login?redirect=//evil.com`, which a naive login-page handler
+    // could then use for `router.push(redirect)`.
+    //
+    // We validate *and* forward the already-normalized path so that
+    // case / encoding / duplicate-slash variants cannot re-introduce
+    // bypass primitives on the consumer side.
+    if (isSafeRedirectTarget(normalizedPath)) {
+      loginUrl.searchParams.set('redirect', normalizedPath);
+    }
     const response = NextResponse.redirect(loginUrl);
     applySecurityHeaders(response);
     return response;
@@ -64,7 +128,12 @@ export async function middleware(request: NextRequest) {
   // For admin-gated paths we *cannot* trust the client-side role: we must ask
   // the backend who the authenticated user is. The backend is the only party
   // that can validate the session JWT and return the real role.
-  const isAdminPath = ADMIN_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  //
+  // Matching is performed against the *normalized* path so trailing slashes,
+  // mixed case, or percent-encoded characters cannot bypass the gate.
+  const isAdminPath = ADMIN_PATHS.some(
+    (p) => normalizedPath === p || normalizedPath.startsWith(`${p}/`),
+  );
   if (isAdminPath && token) {
     const role = await fetchAuthenticatedRole(request);
     if (role !== 'admin') {

@@ -18,6 +18,7 @@
 import { createSiweMessage } from 'viem/siwe';
 import { csrfHeaders } from '@/lib/csrf';
 import { API_URL } from '@/lib/config';
+import { EXPECTED_CHAIN_ID } from '@/lib/web3/config';
 
 export interface SiweSignFn {
   (args: { message: string; account: `0x${string}` }): Promise<`0x${string}`>;
@@ -45,10 +46,18 @@ export async function fetchSiweNonce(): Promise<string> {
  * Build a SIWE message for the given wallet + nonce, targeting the current
  * browser origin. `window.location` is required, so this helper is
  * browser-only.
+ *
+ * The `chainId` defaults to the application-enforced `EXPECTED_CHAIN_ID`
+ * so the signed statement is always bound to the chain the backend and
+ * contracts expect. Callers should not pass the wallet's currently
+ * connected chain (which can differ from the deployment chain) unless
+ * they have a very specific reason to do so: the backend verifier will
+ * reject any SIWE message whose `Chain ID` does not match
+ * `EXPECTED_CHAIN_ID`.
  */
 export function buildSiweMessage(params: {
   address: `0x${string}`;
-  chainId: number;
+  chainId?: number;
   nonce: string;
   statement?: string;
   issuedAt?: Date;
@@ -56,7 +65,14 @@ export function buildSiweMessage(params: {
   if (typeof window === 'undefined') {
     throw new Error('buildSiweMessage must be called in the browser');
   }
-  const { address, chainId, nonce, statement, issuedAt } = params;
+  const { address, nonce, statement, issuedAt } = params;
+  const chainId = params.chainId ?? EXPECTED_CHAIN_ID;
+  if (chainId !== EXPECTED_CHAIN_ID) {
+    throw new Error(
+      `SIWE chainId (${chainId}) must match the application-enforced ` +
+        `EXPECTED_CHAIN_ID (${EXPECTED_CHAIN_ID}).`,
+    );
+  }
   return createSiweMessage({
     address,
     chainId,
@@ -100,19 +116,35 @@ export async function verifySiwe(args: {
 /**
  * Run the full nonce → sign → verify flow.
  *
- * @param address   The connected wallet address.
- * @param chainId   The chain the user is currently on (included in the SIWE message).
+ * The SIWE message is **always** bound to {@link EXPECTED_CHAIN_ID} — the
+ * chain the deployed contracts live on — regardless of what chain the
+ * wallet is currently connected to. This prevents accepting signatures
+ * scoped to a different network.
+ *
+ * @param address     The connected wallet address.
  * @param signMessage Adapter that calls the wallet's personal_sign (e.g. wagmi's `signMessageAsync`).
  */
 export async function performSiwe(args: {
   address: `0x${string}`;
-  chainId: number;
+  /**
+   * @deprecated The SIWE chainId is always `EXPECTED_CHAIN_ID`; when a
+   * value is supplied it is validated (not silently accepted) and must
+   * equal `EXPECTED_CHAIN_ID`, otherwise the call throws. Prefer omitting
+   * this field entirely in new code.
+   */
+  chainId?: number;
   signMessage: SiweSignFn;
 }): Promise<void> {
+  if (args.chainId !== undefined && args.chainId !== EXPECTED_CHAIN_ID) {
+    throw new Error(
+      `SIWE chainId (${args.chainId}) must match the application-enforced ` +
+        `EXPECTED_CHAIN_ID (${EXPECTED_CHAIN_ID}).`,
+    );
+  }
   const nonce = await fetchSiweNonce();
   const message = buildSiweMessage({
     address: args.address,
-    chainId: args.chainId,
+    chainId: EXPECTED_CHAIN_ID,
     nonce,
   });
   const signature = await args.signMessage({ message, account: args.address });

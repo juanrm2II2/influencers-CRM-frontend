@@ -118,12 +118,13 @@ describe('SIWE client', () => {
 
       const signMessage = vi.fn(async ({ message }: { message: string }) => {
         expect(message).toContain('Nonce: nonceabc123');
+        // SIWE message is bound to EXPECTED_CHAIN_ID (1 in tests).
+        expect(message).toContain('Chain ID: 1');
         return '0xsigned' as `0x${string}`;
       });
 
       await performSiwe({
         address: '0x1234567890123456789012345678901234567890',
-        chainId: 1,
         signMessage,
       });
 
@@ -133,6 +134,18 @@ describe('SIWE client', () => {
       const body = JSON.parse(verifyCall[1].body as string);
       expect(body.signature).toBe('0xsigned');
       expect(body.message).toContain('Nonce: nonceabc123');
+      expect(body.message).toContain('Chain ID: 1');
+    });
+
+    it('rejects a caller-supplied chainId that does not match EXPECTED_CHAIN_ID', async () => {
+      await expect(
+        performSiwe({
+          address: '0x1234567890123456789012345678901234567890',
+          chainId: 137,
+          signMessage: vi.fn(),
+        }),
+      ).rejects.toThrow(/EXPECTED_CHAIN_ID/);
+      expect(fetch).not.toHaveBeenCalled();
     });
   });
 });

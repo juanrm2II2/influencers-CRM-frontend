@@ -18,6 +18,18 @@ if (process.env.NODE_ENV === 'production') {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // ─── Subresource Integrity (supply-chain hardening) ────────────────────
+  // Next.js emits SRI `integrity` attributes on self-hosted <script> tags
+  // built from the compiled chunks so that a tampered bundle delivered by
+  // a compromised CDN will be rejected by the browser. Combined with the
+  // strict `script-src 'self'` directive in lib/csp.ts (no inline, no
+  // external scripts) this gives us strong script provenance guarantees.
+  experimental: {
+    sri: {
+      algorithm: 'sha256',
+    },
+  },
+
   images: {
     // Profile images are served from various social media CDNs (TikTok, Instagram,
     // YouTube, Twitter) whose hostnames are dynamic and cannot be pre-enumerated.

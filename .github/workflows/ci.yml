@@ -105,3 +105,17 @@ jobs:
       - name: Report moderate production advisories (non-blocking)
         continue-on-error: true
         run: npm audit --omit=dev --audit-level=moderate
+
+  readiness:
+    name: Pre-ICO Readiness Score
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Report-only by default so adopting the audit does not regress CI.
+      # Flip to `--enforce` once open HIGH/MEDIUM findings are closed and
+      # the score crosses the `passThreshold` in audit/findings.json.
+      - name: Compute audit readiness score (100 - 12H - 4M - 1L)
+        run: node scripts/compute-audit-score.mjs

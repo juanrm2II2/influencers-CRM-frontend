@@ -1,0 +1,236 @@
+{
+  "$schema": "./findings.schema.json",
+  "metadata": {
+    "title": "Pre-ICO Frontend Security Audit",
+    "repository": "juanrm2II2/influencers-CRM-frontend",
+    "auditDate": "2026-04-24",
+    "auditor": "Senior Blockchain Security Auditor (automated Copilot review)",
+    "scope": [
+      "Next.js 15 App Router frontend",
+      "Web3 token-sale flow (wagmi/viem/RainbowKit, SIWE)",
+      "Authentication / session / JWT / CSRF",
+      "CSP, security headers, build config",
+      "Compliance (GDPR/CCPA, KYC/AML via SumSub)",
+      "Dependencies (npm supply-chain)"
+    ],
+    "outOfScope": [
+      "Backend Express API implementation",
+      "Smart-contract source (token sale, vesting)",
+      "Infrastructure / DNS / CDN configuration"
+    ],
+    "scoreFormula": "100 - 12*High - 4*Medium - 1*Low",
+    "passThreshold": 70
+  },
+  "findings": [
+    {
+      "id": "H-01",
+      "severity": "High",
+      "area": "Auth/Session",
+      "file": "context/AuthContext.tsx",
+      "lines": "30",
+      "title": "User profile cache TTL (15 min) delays role-revocation propagation",
+      "excerpt": "const USER_CACHE_TTL_MS = 15 * 60 * 1000;",
+      "risk": "If the backend revokes an admin role, the client continues to honor the cached profile for up to 15 minutes. During that window a demoted user can still render admin-only UI affordances. Middleware re-checks on navigation, but the UX-level privilege gap is a phishing/social-engineering vector.",
+      "fix": "Reduce TTL to <=5 min, invalidate the cache on every successful /api/auth/me poll, and listen for a server-sent 'role-changed' event or BroadcastChannel message to hard-clear sessionStorage immediately.",
+      "status": "open"
+    },
+    {
+      "id": "H-02",
+      "severity": "High",
+      "area": "Web3/Token Sale",
+      "file": "lib/web3/hooks.ts",
+      "lines": "~202 (contribute write hook)",
+      "title": "Unvalidated amountEth input passed to parseEther",
+      "excerpt": "value = parseEther(amountEth); // amountEth flows in from user input",
+      "risk": "parseEther throws on malformed strings and silently truncates beyond 18 decimals. No min/max bounds are enforced client-side, so UX is poor and fat-finger contributions (e.g. '1000' instead of '1') are not warned about before the wallet prompt. Contract min/max only revert after the user has paid gas.",
+      "fix": "Add explicit validation: reject non-numeric, negative, zero, >18 decimals, or amounts outside [MIN_CONTRIBUTION, MAX_CONTRIBUTION] before calling parseEther. Surface a human-readable error and require explicit confirmation above a soft cap.",
+      "status": "open"
+    },
+    {
+      "id": "H-03",
+      "severity": "High",
+      "area": "API/Network",
+      "file": "lib/api.ts",
+      "lines": "8-24",
+      "title": "Axios client has no timeout, no retry, no abort, no 401 deduplication",
+      "excerpt": "const api = axios.create({ baseURL: API_URL, withCredentials: true });",
+      "risk": "Requests can hang indefinitely on a slow/unreachable backend, freezing the UI. Concurrent 401s from expired sessions all trigger logout redirects and can loop. No AbortSignal means React unmounts leak in-flight requests that may later resolve and write to stale state.",
+      "fix": "Set timeout: 30000. Add a response interceptor that funnels 401s through a single in-flight Promise (deduplicate). Expose an AbortController per hook call. Exponential-backoff retry for idempotent GETs only.",
+      "status": "open"
+    },
+    {
+      "id": "H-04",
+      "severity": "High",
+      "area": "Routing/Middleware",
+      "file": "middleware.ts",
+      "lines": "~117",
+      "title": "Admin role fetched from backend inside middleware with no timeout",
+      "excerpt": "const role = await fetchAuthenticatedRole(request);",
+      "risk": "If the backend is slow or partitioned, middleware blocks every protected request. A malformed/empty JSON response falls through to null, which is treated as non-admin (fail-closed for privilege but denies legitimate admins). No caching means every navigation hits the backend.",
+      "fix": "Use AbortSignal.timeout(3000) on the fetch; on timeout/malformed body, return 503 for admin routes and fall back to a cached role (signed, short-TTL cookie) for non-admin routes. Memoize per session id for 60 s.",
+      "status": "open"
+    },
+    {
+      "id": "H-05",
+      "severity": "High",
+      "area": "Web3/Contracts",
+      "file": "lib/web3/contracts.ts",
+      "lines": "146-162",
+      "title": "Contract addresses silently fall back to the zero address in production",
+      "excerpt": "if (process.env.NODE_ENV !== 'test') { console.warn(...) } return ZERO_ADDRESS;",
+      "risk": "A missing NEXT_PUBLIC_TOKEN_SALE_ADDRESS / NEXT_PUBLIC_VESTING_ADDRESS in production only logs a warning. The UI keeps rendering the contribution form; transactions fail at submit and can be misinterpreted as a deliberate zero-address send.",
+      "fix": "In next.config.mjs throw at build time when NODE_ENV==='production' and either address is missing or not a valid 0x-prefixed 20-byte hex. At runtime, assertContractConfigured() should be called before rendering write-capable UI, not only before writeContract.",
+      "status": "open"
+    },
+
+    {
+      "id": "M-01",
+      "severity": "Medium",
+      "area": "Secrets/Env",
+      "file": "lib/web3/config.ts",
+      "lines": "54-62",
+      "title": "WalletConnect project ID is shipped in the client bundle",
+      "excerpt": "const id = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;",
+      "risk": "All NEXT_PUBLIC_* values are public by design, but WalletConnect IDs are rate-limited per project. A scraped ID can be abused to exhaust the project's quota or to observe relay metadata. Not a credential, but should be rotatable.",
+      "fix": "Document rotation procedure in .env.local.example, add a gitleaks pre-commit hook, monitor WalletConnect analytics for abuse. Consider proxying relay traffic through a backend.",
+      "status": "open"
+    },
+    {
+      "id": "M-02",
+      "severity": "Medium",
+      "area": "Auth/SIWE",
+      "file": "lib/web3/siwe.ts",
+      "lines": "127-152",
+      "title": "Client does not rate-limit SIWE nonce fetches",
+      "excerpt": "const nonce = await fetchSiweNonce();",
+      "risk": "Backend must be the real line of defense, but a client-side guard prevents accidental self-DoS (e.g., React StrictMode double-invoke + retry loops) and surfaces backoff UI consistently.",
+      "fix": "Throttle fetchSiweNonce to <=1/5 s per address; cache the active nonce for 60 s; surface a backoff UI if the backend responds 429.",
+      "status": "open"
+    },
+    {
+      "id": "M-03",
+      "severity": "Medium",
+      "area": "XSS/Sanitization",
+      "file": "lib/sanitize.ts",
+      "lines": "8-18",
+      "title": "sanitizeText is a no-op on the server",
+      "excerpt": "if (typeof window === 'undefined') return input;",
+      "risk": "Any future SSR/RSC path that feeds user-controlled strings into a non-JSX sink (CSV export, Content-Disposition, dangerouslySetInnerHTML in a server component) bypasses sanitization entirely. React escaping currently saves us but the contract is fragile.",
+      "fix": "Replace the server branch with isomorphic-dompurify or a minimal strip-tags implementation so sanitization is always enforced. Add a unit test for the SSR path.",
+      "status": "open"
+    },
+    {
+      "id": "M-04",
+      "severity": "Medium",
+      "area": "Compliance/GDPR",
+      "file": "app/data-export/page.tsx",
+      "lines": "42-52",
+      "title": "Data-export action is not audit-logged",
+      "excerpt": "const blob = new Blob([content], { type: mimeType }); /* download */",
+      "risk": "GDPR Art. 15/30 require the data controller to keep a log of access and export events. The frontend triggers the export but does not notify the backend of a successful download, leaving the audit trail incomplete.",
+      "fix": "POST an audit/data-export event to the backend (user id, timestamp, row count, format, success flag) before triggering the blob download. Store immutably for at least the statutory retention window.",
+      "status": "open"
+    },
+    {
+      "id": "M-05",
+      "severity": "Medium",
+      "area": "API/CSRF",
+      "file": "lib/api.ts",
+      "lines": "15-24",
+      "title": "CSRF header attached only if cookie exists; no pre-flight nonce fetch",
+      "excerpt": "if (token) { config.headers.set(CSRF_HEADER_NAME, token); }",
+      "risk": "If the XSRF-TOKEN cookie is missing (first visit, third-party cookie stripping, Safari ITP), the state-changing request goes out without an X-XSRF-TOKEN header. The backend must reject such requests, but the frontend should never rely on backend behavior alone.",
+      "fix": "On app bootstrap, call GET /api/csrf to seed the token. Fail state-changing requests client-side if the token is absent. Add a Vitest test asserting this.",
+      "status": "open"
+    },
+
+    {
+      "id": "L-01",
+      "severity": "Low",
+      "area": "Redirect",
+      "file": "lib/redirect.ts",
+      "lines": "29-41",
+      "title": "Path-traversal segments (..) are not explicitly rejected",
+      "excerpt": "if (/[\\x00-\\x1f\\x7f\\s\\\\]/.test(path)) return false;",
+      "risk": "Router normalization already neutralises /.., but explicit rejection is clearer intent and defends against a future router change.",
+      "fix": "Add: if (path.split('/').some(seg => seg === '..')) return false; with a dedicated unit test.",
+      "status": "open"
+    },
+    {
+      "id": "L-02",
+      "severity": "Low",
+      "area": "UI/Rendering",
+      "file": "components/web3/TransactionReceipt.tsx",
+      "lines": "74, 96",
+      "title": "Block-explorer URL is hardcoded to Etherscan mainnet",
+      "excerpt": "<a href={explorerUrl(txState.hash)} target=\"_blank\" rel=\"noopener noreferrer\">",
+      "risk": "If EXPECTED_CHAIN_ID is switched to a testnet or L2, the user is linked to the wrong explorer. Not a security vuln, but erodes trust.",
+      "fix": "Map chain id -> explorer base URL in lib/web3/config.ts and build the link from EXPECTED_CHAIN_ID.",
+      "status": "open"
+    },
+    {
+      "id": "L-03",
+      "severity": "Low",
+      "area": "State Mgmt",
+      "file": "context/AuthContext.tsx",
+      "lines": "140-183",
+      "title": "No AbortController on the bootstrap /api/auth/me fetch",
+      "excerpt": "useEffect(() => { let cancelled = false; (async () => { ... })(); }, []);",
+      "risk": "React StrictMode double-invokes effects; the first fetch races with the second and can set stale state. The boolean flag mitigates the state write but not the network waste.",
+      "fix": "Use AbortController and pass its signal to fetch; abort in the cleanup function.",
+      "status": "open"
+    },
+    {
+      "id": "L-04",
+      "severity": "Low",
+      "area": "Web3/UX",
+      "file": "lib/web3/hooks.ts",
+      "lines": "140-150",
+      "title": "useUserContribution collapses loading + zero into a single state",
+      "excerpt": "return { contribution: data ?? BigInt(0), isLoading, refetch };",
+      "risk": "If the RPC is degraded and returns undefined, UI displays '0 contributed' when the correct message is 'unknown; please retry'.",
+      "fix": "Return { contribution, isLoading, error } and let the component distinguish the three states.",
+      "status": "open"
+    },
+    {
+      "id": "L-05",
+      "severity": "Low",
+      "area": "Build/Config",
+      "file": "next.config.mjs",
+      "lines": "27-31",
+      "title": "No explicit Cache-Control for SRI-protected bundles",
+      "excerpt": "experimental: { sri: { algorithm: 'sha256' } }",
+      "risk": "A stale CDN edge could continue serving an older hash after rotation, producing SRI-mismatch errors for users.",
+      "fix": "Add a headers() rule for /_next/static/* enforcing Cache-Control: public, max-age=31536000, immutable, and document the CDN purge step in the deploy runbook.",
+      "status": "open"
+    },
+    {
+      "id": "L-06",
+      "severity": "Low",
+      "area": "Compliance/Cookies",
+      "file": "app/cookie-policy/page.tsx",
+      "lines": "page-wide",
+      "title": "Cookie-consent state lives in localStorage (not server-auditable)",
+      "excerpt": "localStorage.setItem('cookie-consent', ...)",
+      "risk": "Non-sensitive, but GDPR Art. 7(1) asks controllers to demonstrate consent. A user who clears localStorage leaves no server-side trace that consent was ever given.",
+      "fix": "Mirror the consent payload to the backend on acceptance (POST /api/consent) and issue a signed cookie so the server can prove consent on audit.",
+      "status": "open"
+    }
+  ],
+  "verdict": {
+    "overall": "CONDITIONALLY READY",
+    "summary": "Frontend is in strong shape: strict CSP with Trusted Types, SRI, httpOnly JWT cookies, double-submit CSRF, centralized open-redirect guard, SIWE with chain-id/domain binding, SumSub KYC gate, and an extensive Vitest suite. The five High-severity findings are hardening items rather than directly exploitable vulnerabilities and are fixable within 1-2 sprints. Pre-ICO investor demos are reasonable; public sale should wait until HIGH findings close AND the out-of-scope items (smart contract audit, backend audit, penetration test, bug bounty) complete."
+  },
+  "gaps": [
+    "Independent backend (Express) security audit",
+    "Smart-contract formal verification (token sale + vesting)",
+    "Third-party penetration test (OWASP ASVS L2)",
+    "Public bug-bounty program (Immunefi/HackerOne)",
+    "Legal review of Privacy Policy, Terms, DPA by qualified counsel",
+    "Load & chaos testing on a production-parity staging environment",
+    "Documented Incident Response plan and runbooks",
+    "Post-launch SIEM / monitoring / alerting (CSP reports, 401 spikes, tx failures)",
+    "KYC provider redundancy (fallback to second vendor)",
+    "Immutable archival of frontend build artifacts (IPFS/Arweave mirror)"
+  ]
+}

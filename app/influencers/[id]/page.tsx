@@ -164,7 +164,6 @@ export default function InfluencerDetailPage() {
                   width={80}
                   height={80}
                   className="w-full h-full object-cover"
-                  unoptimized
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl font-bold">

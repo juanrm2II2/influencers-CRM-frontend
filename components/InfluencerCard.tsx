@@ -25,7 +25,6 @@ export default function InfluencerCard({ influencer }: { influencer: Influencer 
                 width={48}
                 height={48}
                 className="w-full h-full object-cover"
-                unoptimized
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg font-bold">

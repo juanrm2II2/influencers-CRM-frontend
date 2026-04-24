@@ -51,4 +51,17 @@ describe('EXPECTED_CHAIN_ID', () => {
     const { EXPECTED_CHAIN_ID } = await import('../config');
     expect(EXPECTED_CHAIN_ID).toBe(1);
   });
+
+  it('throws when env var is a chain ID that is not in the supported-chain allow-list', async () => {
+    // 999 is not a supported wagmi chain; the module must refuse to load.
+    process.env.NEXT_PUBLIC_EXPECTED_CHAIN_ID = '999';
+    await expect(import('../config')).rejects.toThrow(/allow-list/i);
+  });
+
+  it('accepts a chain ID that is in the supported-chain allow-list', async () => {
+    // Sepolia (11155111) is present in `supportedChains`.
+    process.env.NEXT_PUBLIC_EXPECTED_CHAIN_ID = '11155111';
+    const { EXPECTED_CHAIN_ID } = await import('../config');
+    expect(EXPECTED_CHAIN_ID).toBe(11155111);
+  });
 });

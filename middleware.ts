@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { CSP_HEADER_NAME, buildCspHeaderValue } from '@/lib/csp';
 import { API_URL } from '@/lib/config';
+import { isSafeRedirectTarget } from '@/lib/redirect';
 
 // Routes that don't require authentication
 const PUBLIC_PATHS = ['/login', '/privacy', '/terms', '/cookie-policy', '/dpa', '/data-practices'];
@@ -50,28 +51,6 @@ function normalizePath(pathname: string): string {
     decoded = decoded.slice(0, -1);
   }
   return decoded;
-}
-
-/**
- * Decide whether a freshly-computed pathname is safe to place into the
- * `?redirect=` query parameter forwarded to the login page. The login page
- * (and any future consumer) may navigate to this value after a successful
- * sign-in, so we must guarantee it resolves to a *same-origin* path —
- * never to an absolute URL, protocol-relative URL (`//evil.com`),
- * backslash-smuggled URL (`/\evil.com`), or anything else that a browser
- * might interpret as cross-origin.
- */
-function isSafeRedirectTarget(path: string): boolean {
-  if (typeof path !== 'string' || path.length === 0 || path.length > 512) return false;
-  // Must be a relative path rooted at /.
-  if (path[0] !== '/') return false;
-  // Reject protocol-relative and backslash-smuggled URLs.
-  if (path.startsWith('//') || path.startsWith('/\\')) return false;
-  // Reject anything containing a control character, whitespace, or a
-  // backslash anywhere in the path — these are classic open-redirect
-  // bypass vectors in browser URL parsers.
-  if (/[\x00-\x1f\x7f\s\\]/.test(path)) return false;
-  return true;
 }
 
 export async function middleware(request: NextRequest) {

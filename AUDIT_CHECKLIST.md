@@ -12,7 +12,7 @@ The CI job `Pre-ICO Readiness` in `.github/workflows/ci.yml` runs
 score to the step summary, and can be configured to fail the build via
 `--enforce` (default is report-only so adopting the audit does not break CI).
 
-Current score at time of audit: **14 %** (5 High + 5 Medium + 6 Low open).
+Current score at time of audit: **10 %** (5 High + 6 Medium + 6 Low open).
 
 ---
 
@@ -51,6 +51,9 @@ Current score at time of audit: **14 %** (5 High + 5 Medium + 6 Low open).
       download (GDPR Art. 30).
 - [ ] **M-05** `lib/api.ts:15-24` — Bootstrap CSRF token on app load and reject
       state-changing requests client-side when the cookie is absent.
+- [ ] **M-06** `app/data-export/page.tsx:11-37` — Neutralize CSV formula-injection
+      prefixes (`=`, `+`, `-`, `@`, `\t`, `\r`) before writing each field; quote every
+      field unconditionally; add a unit test for the injection vector.
 
 ## LOW severity (weight 1 each)
 
@@ -71,9 +74,10 @@ Current score at time of audit: **14 %** (5 High + 5 Medium + 6 Low open).
 
 **CONDITIONALLY READY** — the frontend is well-architected (strict CSP with Trusted
 Types, SRI, httpOnly JWT cookies, double-submit CSRF, centralized open-redirect guard,
-SIWE with chain-id/domain binding, SumSub KYC gate, 263+ Vitest specs). The five High
+SIWE with chain-id/domain binding, SumSub KYC gate, 260+ Vitest specs). The five High
 findings are hardening items rather than directly exploitable vulnerabilities and are
-closable within 1–2 sprints.
+closable within 1–2 sprints. The only directly exploitable issue is M-06 (CSV
+formula-injection in the GDPR data-export path) and it is a one-file fix.
 
 Pre-ICO investor demos: OK.
 Public sale: block until all HIGH are closed **and** the out-of-scope items below

@@ -143,6 +143,18 @@
       "fix": "On app bootstrap, call GET /api/csrf to seed the token. Fail state-changing requests client-side if the token is absent. Add a Vitest test asserting this.",
       "status": "open"
     },
+    {
+      "id": "M-06",
+      "severity": "Medium",
+      "area": "Compliance/Export",
+      "file": "app/data-export/page.tsx",
+      "lines": "11-37",
+      "title": "CSV export does not neutralize formula-injection prefixes",
+      "excerpt": "const escape = (val) => { if (str.includes(',') || str.includes('\"') || str.includes('\\n')) { return `\"${str.replace(/\"/g, '\"\"')}`; } return str; };",
+      "risk": "Fields sourced from user-controlled data (bio, notes, handle, full_name) can begin with =, +, -, @, tab (\\t) or carriage-return (\\r). When the exported CSV is opened in Excel / Google Sheets / LibreOffice those prefixes are interpreted as spreadsheet formulas, enabling attacks such as =HYPERLINK / =WEBSERVICE / DDE command execution that exfiltrate the victim's row data to an attacker-controlled URL. This is classic CWE-1236 formula injection and is particularly serious for GDPR-driven data-export endpoints.",
+      "fix": "Before quoting, if the first character of a field is one of `= + - @ \\t \\r`, prefix it with a single apostrophe (') so spreadsheets treat the cell as text. Quote EVERY field unconditionally, not only when it contains a delimiter, so leading whitespace cannot hide a formula prefix. Add a unit test in lib/__tests__/export.test.ts that asserts =1+1 round-trips to '=1+1 and that a bio of '@SUM(A1)' is neutralized.",
+      "status": "open"
+    },
 
     {
       "id": "L-01",
@@ -219,7 +231,7 @@
   ],
   "verdict": {
     "overall": "CONDITIONALLY READY",
-    "summary": "Frontend is in strong shape: strict CSP with Trusted Types, SRI, httpOnly JWT cookies, double-submit CSRF, centralized open-redirect guard, SIWE with chain-id/domain binding, SumSub KYC gate, and an extensive Vitest suite. The five High-severity findings are hardening items rather than directly exploitable vulnerabilities and are fixable within 1-2 sprints. Pre-ICO investor demos are reasonable; public sale should wait until HIGH findings close AND the out-of-scope items (smart contract audit, backend audit, penetration test, bug bounty) complete."
+    "summary": "Frontend is in strong shape: strict CSP with Trusted Types, SRI, httpOnly JWT cookies, double-submit CSRF, centralized open-redirect guard, SIWE with chain-id/domain binding, SumSub KYC gate, and an extensive Vitest suite (260+ specs). The five High-severity findings are hardening items rather than directly exploitable vulnerabilities and are fixable within 1-2 sprints; the new Medium M-06 (CSV formula injection in the GDPR data-export path) is the only directly exploitable issue and is a one-file fix. Pre-ICO investor demos are reasonable; public sale should wait until all HIGH findings close AND the out-of-scope items (smart-contract audit, backend audit, penetration test, bug-bounty) complete."
   },
   "gaps": [
     "Independent backend (Express) security audit",

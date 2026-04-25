@@ -18,7 +18,7 @@
     "dompurify": "^3.3.3",
     "next": "15.5.15",
     "react": "^18",
-    "react-dom": "^18",
+    "react-dom": "^19",
     "viem": "^2.47.12",
     "wagmi": "^2.19.5"
   },
@@ -28,7 +28,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^25",
     "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.1.2",
     "eslint": "^9.39.4",

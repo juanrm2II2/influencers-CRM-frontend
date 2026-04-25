@@ -88,6 +88,35 @@ We follow a 90-day coordinated-disclosure window for High/Critical issues,
 extendable by mutual agreement when a fix is materially in progress. Lower
 severity issues default to public disclosure on fix.
 
+## Known residual dependency advisories (audit M-08)
+
+`npm audit --omit=dev` currently surfaces **11 moderate** advisories. All of
+them are **transitive** through the wallet-SDK chain
+(`@wagmi/connectors` → `@metamask/sdk` → `uuid`,
+`@metamask/rpc-errors` → `@metamask/utils`, `@rainbow-me/rainbowkit`)
+or through Next.js' bundled build-time `postcss`. None are directly
+exploitable in the deployed bundle today, for two compounding reasons:
+
+1. **Strict CSP + Trusted Types.** `lib/csp.ts` ships
+   `script-src 'self'` + `require-trusted-types-for 'script'`, which
+   blocks every documented DOM-XSS sink that the postcss CWE-79
+   advisory describes. The `postcss` package only runs at build time
+   on this codebase; no runtime path renders attacker-controlled CSS
+   through it.
+2. **Wallet-SDK isolation.** The MetaMask / RainbowKit chain only loads
+   once a user explicitly clicks "Connect Wallet". Up to that point the
+   vulnerable code is dead in the bundle, and after it loads the only
+   side-effect is RPC-over-WebSocket to a wallet the user trusts.
+
+We track the upstream releases that resolve these advisories
+(`@metamask/sdk` next minor, `wagmi` next minor, `@rainbow-me/rainbowkit`
+next compatible release, `postcss ≥ 8.5.10`) and bump as soon as they
+ship. The CI `npm audit` gate already fails on any **High/Critical**
+production advisory; the moderate gate is non-blocking until the
+upstreams cut fixes (see comments in `.github/workflows/ci.yml`). The
+Dependabot config groups these packages into a single `web3-wallet`
+update PR (see `.github/dependabot.yml`).
+
 ## Related documents
 
 - [`docs/INCIDENT_RESPONSE.md`](docs/INCIDENT_RESPONSE.md) — how we respond once a report is accepted.

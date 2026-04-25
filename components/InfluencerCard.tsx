@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { Influencer } from '@/types';
 import StatusBadge from './StatusBadge';
 import PlatformIcon from './PlatformIcon';
+import DisplayName from './DisplayName';
+import { sanitizeText } from '@/lib/sanitize';
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -33,8 +35,13 @@ export default function InfluencerCard({ influencer }: { influencer: Influencer 
             )}
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-gray-900 truncate">{influencer.full_name || influencer.handle}</p>
-            <p className="text-sm text-gray-500 truncate">@{influencer.handle}</p>
+            <p className="font-semibold text-gray-900 truncate">{sanitizeText(influencer.full_name || influencer.handle)}</p>
+            <DisplayName
+              as="p"
+              className="text-sm text-gray-500 truncate"
+              prefix="@"
+              value={influencer.handle}
+            />
           </div>
           <div className="ml-auto flex-shrink-0">
             <PlatformIcon platform={influencer.platform} />
@@ -61,9 +68,10 @@ export default function InfluencerCard({ influencer }: { influencer: Influencer 
 
         {influencer.niche && (
           <div>
-            <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
-              {influencer.niche}
-            </span>
+            <DisplayName
+              className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full"
+              value={influencer.niche}
+            />
           </div>
         )}
       </div>

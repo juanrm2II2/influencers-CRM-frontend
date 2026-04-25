@@ -206,4 +206,74 @@ describe('lib/api', () => {
       expect(mockPost).toHaveBeenCalledWith('/api/influencers/1/outreach', outreachData);
     });
   });
+
+  // ─── 401 redirect target (audit L-07) ────────────────────────────────────
+  describe('compute401RedirectTarget', () => {
+    it('returns /login when given a falsy location', async () => {
+      const { compute401RedirectTarget } = await import('@/lib/api');
+      expect(compute401RedirectTarget(null)).toBe('/login');
+      expect(compute401RedirectTarget(undefined)).toBe('/login');
+    });
+
+    it('preserves the requested path on a same-origin route', async () => {
+      const { compute401RedirectTarget } = await import('@/lib/api');
+      expect(
+        compute401RedirectTarget({ pathname: '/dashboard', search: '' }),
+      ).toBe('/login?redirect=%2Fdashboard');
+    });
+
+    it('preserves the query string on the requested path', async () => {
+      const { compute401RedirectTarget } = await import('@/lib/api');
+      expect(
+        compute401RedirectTarget({
+          pathname: '/influencers/123',
+          search: '?tab=outreach',
+        }),
+      ).toBe('/login?redirect=%2Finfluencers%2F123%3Ftab%3Doutreach');
+    });
+
+    it('collapses to /login when already on /login', async () => {
+      const { compute401RedirectTarget } = await import('@/lib/api');
+      expect(compute401RedirectTarget({ pathname: '/login', search: '' })).toBe(
+        '/login',
+      );
+      expect(
+        compute401RedirectTarget({ pathname: '/login', search: '?redirect=%2Ffoo' }),
+      ).toBe('/login');
+    });
+
+    it('collapses to /login on protocol-relative / off-origin paths', async () => {
+      const { compute401RedirectTarget } = await import('@/lib/api');
+      expect(
+        compute401RedirectTarget({ pathname: '//evil.com/foo', search: '' }),
+      ).toBe('/login');
+      expect(
+        compute401RedirectTarget({ pathname: '/\\evil.com', search: '' }),
+      ).toBe('/login');
+    });
+
+    it('collapses to /login on path-traversal segments', async () => {
+      const { compute401RedirectTarget } = await import('@/lib/api');
+      expect(
+        compute401RedirectTarget({ pathname: '/foo/../admin', search: '' }),
+      ).toBe('/login');
+    });
+
+    it('collapses to /login on whitespace / control chars', async () => {
+      const { compute401RedirectTarget } = await import('@/lib/api');
+      expect(
+        compute401RedirectTarget({ pathname: '/foo bar', search: '' }),
+      ).toBe('/login');
+      expect(
+        compute401RedirectTarget({ pathname: '/foo\nbar', search: '' }),
+      ).toBe('/login');
+    });
+
+    it('collapses to /login when pathname is empty', async () => {
+      const { compute401RedirectTarget } = await import('@/lib/api');
+      expect(compute401RedirectTarget({ pathname: '', search: '' })).toBe(
+        '/login',
+      );
+    });
+  });
 });

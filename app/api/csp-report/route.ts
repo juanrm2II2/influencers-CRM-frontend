@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cspRateLimiter } from '@/lib/csp-rate-limiter';
+import { getClientIp } from '@/lib/trusted-proxy';
 
 /**
  * POST /api/csp-report
@@ -7,7 +8,10 @@ import { cspRateLimiter } from '@/lib/csp-rate-limiter';
  * In production, forward these reports to your monitoring service.
  *
  * Protections:
- *  - Rate limited to 10 requests / minute per IP.
+ *  - Rate limited to 10 requests / minute per IP (audit L-08: only
+ *    keyed per-IP when behind a trusted reverse proxy; otherwise
+ *    collapses to a single global bucket so attacker-controlled
+ *    `x-forwarded-for` cannot evict legitimate IPs).
  *  - Content-Type must be application/csp-report or application/json.
  *  - Request body must not exceed 10 KB.
  */
@@ -20,16 +24,6 @@ const ALLOWED_CONTENT_TYPES = [
 ];
 
 const encoder = new TextEncoder();
-
-function getClientIp(request: Request): string {
-  const headers = request.headers;
-  // Vercel / common reverse-proxy headers
-  return (
-    headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    headers.get('x-real-ip') ||
-    '127.0.0.1'
-  );
-}
 
 export async function POST(request: Request) {
   // ── Rate limiting ────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { getInfluencer, updateInfluencer, deleteInfluencer } from '@/lib/api';
 import { sanitizeText } from '@/lib/sanitize';
+import DisplayName from '@/components/DisplayName';
 import { Influencer, Outreach, Status } from '@/types';
 import StatusBadge from '@/components/StatusBadge';
 import PlatformIcon from '@/components/PlatformIcon';
@@ -175,12 +176,17 @@ export default function InfluencerDetailPage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl font-bold text-gray-900">
-                  {influencer.full_name || influencer.handle}
+                  {sanitizeText(influencer.full_name || influencer.handle)}
                 </h1>
                 <PlatformIcon platform={influencer.platform} showLabel />
                 <StatusBadge status={influencer.status} />
               </div>
-              <p className="text-gray-500 mt-1">@{influencer.handle}</p>
+              <DisplayName
+                as="p"
+                className="text-gray-500 mt-1"
+                prefix="@"
+                value={influencer.handle}
+              />
               {influencer.profile_url && isValidHttpUrl(influencer.profile_url) && (
                 <a
                   href={influencer.profile_url}
@@ -195,9 +201,10 @@ export default function InfluencerDetailPage() {
                 <p className="text-gray-600 text-sm mt-3 leading-relaxed">{sanitizeText(influencer.bio)}</p>
               )}
               {influencer.niche && (
-                <span className="inline-block mt-3 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
-                  {influencer.niche}
-                </span>
+                <DisplayName
+                  className="inline-block mt-3 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full"
+                  value={influencer.niche}
+                />
               )}
             </div>
 

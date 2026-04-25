@@ -1,6 +1,21 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import { POST } from '../../app/api/csp-report/route';
 import { cspRateLimiter } from '../../lib/csp-rate-limiter';
+
+// Audit L-08: the route's `getClientIp` only honours x-forwarded-for
+// when the deployment is opted-in to trusting proxy headers. Tests
+// simulate a deployment behind a trusted reverse proxy.
+const ORIGINAL_TRUST = process.env.TRUST_PROXY_HEADERS;
+beforeAll(() => {
+  process.env.TRUST_PROXY_HEADERS = 'true';
+});
+afterAll(() => {
+  if (ORIGINAL_TRUST === undefined) {
+    delete process.env.TRUST_PROXY_HEADERS;
+  } else {
+    process.env.TRUST_PROXY_HEADERS = ORIGINAL_TRUST;
+  }
+});
 
 /** Helper to build a Request with sensible defaults for CSP reports. */
 function buildRequest(

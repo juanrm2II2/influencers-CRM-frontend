@@ -1,0 +1,10 @@
+# See https://datatracker.ietf.org/doc/html/rfc9116
+# Replace example.com / example email with production values before launch.
+
+Contact: mailto:security@example.com
+Expires: 2027-04-25T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://example.com/.well-known/security.txt
+Policy: https://github.com/juanrm2II2/influencers-CRM-frontend/blob/main/SECURITY.md
+Acknowledgments: https://github.com/juanrm2II2/influencers-CRM-frontend/blob/main/SECURITY.md#bug-bounty
+# Encryption: https://example.com/.well-known/pgp-key.asc

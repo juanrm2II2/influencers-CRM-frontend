@@ -302,6 +302,68 @@ export function parseContributionAmount(
   return value;
 }
 
+/**
+ * Validate an admin-supplied whitelist *cap* amount. Audit M-07: the
+ * H-02 validator (`parseContributionAmount`) is the only sanctioned
+ * path from a wei-bound user string to `parseEther` on this frontend;
+ * the admin whitelist path used to call `parseEther` directly via
+ * `Number(amountStr) > 0`, which silently accepted scientific notation
+ * (`1e18`), leading sign, hex, and >18-decimal precision-losing input.
+ *
+ * `parseWhitelistAmount` shares the exact same regex / decimal-bound
+ * rules as the contribution validator, but it is intentionally **not**
+ * subject to the SOFT/MIN bounds (those are user-facing contribution
+ * thresholds — admin caps may legitimately be smaller or larger). It
+ * still enforces:
+ *   - decimal-only string (no exponent / hex / sign / spaces)
+ *   - <= 18 fractional digits
+ *   - strictly > 0
+ *   - <= MAX_CONTRIBUTION_WEI (so a fat-finger CSV cannot whitelist a
+ *     cap that would silently overflow downstream type assumptions).
+ *
+ * Throws {@link InvalidContributionError} on any rule violation. Same
+ * error class is reused so existing error rendering code does not have
+ * to special-case the whitelist surface.
+ */
+export function parseWhitelistAmount(amountEth: string): bigint {
+  if (typeof amountEth !== 'string') {
+    throw new InvalidContributionError('Amount is required.');
+  }
+  if (amountEth === '') {
+    throw new InvalidContributionError('Amount is required.');
+  }
+  // Audit M-07: validate the *raw* string with no implicit trim. The
+  // CSV parser in WhitelistManager already trims each cell before
+  // calling us, so any whitespace reaching this point is a sign of
+  // corrupted input (e.g. a stray non-breaking space) and must be
+  // rejected up-front rather than coerced silently.
+  if (!/^\d+(\.\d{1,18})?$/.test(amountEth)) {
+    if (/^\s*\d+\.\d{19,}\s*$/.test(amountEth)) {
+      throw new InvalidContributionError(
+        'Amount has too many decimals (max 18).',
+      );
+    }
+    throw new InvalidContributionError(
+      'Amount must be a positive decimal number (e.g. "1.5").',
+    );
+  }
+  let value: bigint;
+  try {
+    value = parseEther(amountEth);
+  } catch {
+    throw new InvalidContributionError('Amount could not be parsed as ETH.');
+  }
+  if (value <= 0n) {
+    throw new InvalidContributionError('Amount must be greater than 0.');
+  }
+  if (value > MAX_CONTRIBUTION_WEI) {
+    throw new InvalidContributionError(
+      `Amount exceeds the maximum contribution (${MAX_CONTRIBUTION_ETH_STR} ETH).`,
+    );
+  }
+  return value;
+}
+
 export function useContribute() {
   const [writeState, setWriteState] = useState<WriteState>({ status: 'idle' });
   const { writeContractAsync } = useWriteContract();

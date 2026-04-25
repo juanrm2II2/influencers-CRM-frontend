@@ -1,8 +1,12 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { parseEther, isAddress } from 'viem';
-import { useWhitelistManagement } from '@/lib/web3/hooks';
+import { isAddress } from 'viem';
+import {
+  useWhitelistManagement,
+  parseWhitelistAmount,
+  InvalidContributionError,
+} from '@/lib/web3/hooks';
 import { useAuth } from '@/context/AuthContext';
 import TransactionReceipt from './TransactionReceipt';
 
@@ -31,14 +35,23 @@ function parseWhitelistInput(raw: string): { entries: ParsedEntry[]; errors: str
       errors.push(`Line ${i + 1}: invalid address "${addr}"`);
       continue;
     }
-    const amount = Number(amountStr);
-    if (Number.isNaN(amount) || amount <= 0) {
-      errors.push(`Line ${i + 1}: invalid amount "${amountStr}"`);
+    // Audit M-07: route the admin whitelist amount through the same
+    // strict validator used for user-facing contributions, so all
+    // wei-bound user input on the frontend shares one validation
+    // contract (no `1e18`, hex, leading sign, or >18-decimal silent
+    // truncation).
+    let maxContribution: bigint;
+    try {
+      maxContribution = parseWhitelistAmount(amountStr);
+    } catch (err) {
+      const reason =
+        err instanceof InvalidContributionError ? err.message : 'invalid amount';
+      errors.push(`Line ${i + 1}: ${reason} ("${amountStr}")`);
       continue;
     }
     entries.push({
       address: addr as `0x${string}`,
-      maxContribution: parseEther(amountStr),
+      maxContribution,
     });
   }
   return { entries, errors };

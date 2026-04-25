@@ -11,6 +11,27 @@ updates:
       - dependencies
     commit-message:
       prefix: "chore(deps):"
+    # Audit M-08: group the wagmi / MetaMask SDK / RainbowKit family so a
+    # coordinated upstream release (currently the only path to clear the
+    # 11 moderate transitive advisories — see SECURITY.md) lands as a
+    # single PR rather than three competing ones.
+    groups:
+      web3-wallet:
+        patterns:
+          - "wagmi"
+          - "@wagmi/*"
+          - "@metamask/*"
+          - "@rainbow-me/*"
+          - "viem"
+      build-tooling:
+        patterns:
+          - "next"
+          - "postcss"
+          - "tailwindcss"
+          - "eslint*"
+          - "@vitejs/*"
+          - "vitest"
+          - "@vitest/*"
 
   - package-ecosystem: github-actions
     directory: /

@@ -2,6 +2,7 @@ import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { Influencer, Outreach, DashboardFilters } from '@/types';
 import { getCsrfToken, CSRF_HEADER_NAME, CSRF_METHODS } from '@/lib/csrf';
 import { API_URL } from '@/lib/config';
+import { isSafeRedirectTarget } from '@/lib/redirect';
 
 const USER_KEY = 'crm_user';
 
@@ -62,6 +63,36 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 // per page lifetime.
 let logoutInFlight = false;
 
+/**
+ * Compute the navigation target for a 401-induced redirect.
+ *
+ * Audit L-07: when a session expires *during* an authenticated session
+ * we want to drop the user on `/login?redirect=<original-path>` so they
+ * resume their workflow after re-authenticating, instead of being
+ * stranded on a blank login page. The candidate path is validated
+ * through {@link isSafeRedirectTarget} so a tampered `window.location`
+ * (DOM clobbering, future Server Component sink) cannot smuggle an
+ * off-origin URL into the parameter — anything unsafe collapses to a
+ * bare `/login`.
+ *
+ * Exported for unit tests; not part of the public API.
+ *
+ * @internal
+ */
+export function compute401RedirectTarget(
+  location: { pathname: string; search: string } | undefined | null,
+): string {
+  if (!location) return '/login';
+  const candidate = (location.pathname ?? '') + (location.search ?? '');
+  if (candidate === '/login' || candidate.startsWith('/login?')) {
+    return '/login';
+  }
+  if (!isSafeRedirectTarget(candidate)) {
+    return '/login';
+  }
+  return `/login?redirect=${encodeURIComponent(candidate)}`;
+}
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -78,7 +109,13 @@ api.interceptors.response.use(
       } catch {
         // Ignore
       }
-      window.location.href = '/login';
+      let target = '/login';
+      try {
+        target = compute401RedirectTarget(window.location);
+      } catch {
+        // If `window.location` is somehow unreadable, fall through to /login.
+      }
+      window.location.href = target;
     }
     return Promise.reject(error);
   }

@@ -10,6 +10,7 @@ import {
   ChainMismatchError,
   assertContractConfigured,
   parseContributionAmount,
+  parseWhitelistAmount,
   InvalidContributionError,
   MIN_CONTRIBUTION_WEI,
   MAX_CONTRIBUTION_WEI,
@@ -163,5 +164,67 @@ describe('parseContributionAmount', () => {
   it('exposes consistent bounds', () => {
     expect(MIN_CONTRIBUTION_WEI).toBeLessThan(SOFT_CAP_WEI);
     expect(SOFT_CAP_WEI).toBeLessThan(MAX_CONTRIBUTION_WEI);
+  });
+});
+
+// ─── parseWhitelistAmount (audit M-07) ──────────────────────────────────────
+describe('parseWhitelistAmount', () => {
+  it('rejects scientific notation (1e18)', () => {
+    expect(() => parseWhitelistAmount('1e18')).toThrow(InvalidContributionError);
+  });
+
+  it('rejects more than 18 fractional digits', () => {
+    expect(() => parseWhitelistAmount('100.0000000000000000001')).toThrow(
+      /too many decimals/,
+    );
+  });
+
+  it('rejects leading whitespace', () => {
+    expect(() => parseWhitelistAmount(' 1')).toThrow(InvalidContributionError);
+  });
+
+  it('rejects leading sign', () => {
+    expect(() => parseWhitelistAmount('+1')).toThrow(InvalidContributionError);
+    expect(() => parseWhitelistAmount('-1')).toThrow(InvalidContributionError);
+  });
+
+  it('rejects hex notation', () => {
+    expect(() => parseWhitelistAmount('0xff')).toThrow(InvalidContributionError);
+  });
+
+  it('rejects empty / non-string input', () => {
+    expect(() => parseWhitelistAmount('')).toThrow(/required/);
+    expect(() => parseWhitelistAmount('   ')).toThrow(InvalidContributionError);
+    // @ts-expect-error — runtime guard
+    expect(() => parseWhitelistAmount(undefined)).toThrow(/required/);
+    // @ts-expect-error — runtime guard
+    expect(() => parseWhitelistAmount(123)).toThrow(/required/);
+  });
+
+  it('rejects zero', () => {
+    expect(() => parseWhitelistAmount('0')).toThrow(/greater than 0/);
+    expect(() => parseWhitelistAmount('0.0')).toThrow(/greater than 0/);
+  });
+
+  it('rejects amounts above the maximum cap', () => {
+    expect(() => parseWhitelistAmount('1000000')).toThrow(/exceeds the maximum/);
+  });
+
+  it('accepts small amounts below the contribution MIN (admin caps may legitimately be smaller)', () => {
+    // This is the deliberate divergence from parseContributionAmount.
+    expect(parseWhitelistAmount('0.0001')).toBe(100_000_000_000_000n);
+  });
+
+  it('returns the parsed wei value for valid amounts', () => {
+    expect(parseWhitelistAmount('1')).toBe(1_000_000_000_000_000_000n);
+    expect(parseWhitelistAmount('0.5')).toBe(500_000_000_000_000_000n);
+    expect(parseWhitelistAmount('10')).toBe(10_000_000_000_000_000_000n);
+  });
+
+  it('does not require confirmation above the soft cap', () => {
+    // parseContributionAmount throws here without `confirmedAboveSoftCap`.
+    // The whitelist path is admin-only and intentionally bypasses that
+    // user-facing fat-finger guard.
+    expect(parseWhitelistAmount('25')).toBe(25_000_000_000_000_000_000n);
   });
 });
